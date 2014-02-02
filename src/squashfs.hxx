@@ -20,6 +20,7 @@ extern "C"
 #	include <stdint.h>
 }
 
+#include "compressor.hxx"
 #include "util.hxx"
 
 namespace squashfs
@@ -30,6 +31,18 @@ namespace squashfs
 	const uint32_t invalid_frag = 0xffffffffUL;
 
 	const int metadata_size = 8192;
+
+	// compression algos
+	namespace compression
+	{
+		enum compression
+		{
+			zlib = 1,
+			lzma = 2,
+			lzo = 3,
+			xz = 4
+		};
+	}
 
 	// bit fields
 	namespace inode_size
@@ -217,11 +230,14 @@ class InodeReader
 	uint32_t block_size;
 	uint16_t block_log;
 
+	const Compressor& compressor;
+
 	void poll_data();
 
 public:
 	InodeReader(const MMAPFile& new_file,
-		const struct squashfs::super_block& sb);
+		const struct squashfs::super_block& sb,
+		const Compressor& c);
 
 	union squashfs::inode::inode& read();
 };

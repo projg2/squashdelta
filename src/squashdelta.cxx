@@ -13,6 +13,7 @@
 #include <cstdio>
 #include <cstring>
 
+#include "compressor.hxx"
 #include "squashfs.hxx"
 #include "util.hxx"
 
@@ -45,10 +46,32 @@ int main(int argc, char* argv[])
 			return 1;
 		}
 
-		InodeReader ir(f, sb);
+		Compressor* c;
 
-		for (uint32_t i = 0; i < sb.inodes; ++i)
-			ir.read();
+		try
+		{
+			switch (sb.compression)
+			{
+				case squashfs::compression::lzo:
+					c = new LZOCompressor();
+					break;
+				default:
+					std::cerr << "Unsupported compression algorithm.\n";
+					return 1;
+			}
+
+			InodeReader ir(f, sb, *c);
+
+			for (uint32_t i = 0; i < sb.inodes; ++i)
+				ir.read();
+
+			delete c;
+		}
+		catch (std::exception& e)
+		{
+			delete c;
+			throw;
+		}
 	}
 	catch (IOError& e)
 	{

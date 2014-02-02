@@ -1,7 +1,13 @@
 bin_PROGRAMS = squashdelta
 
 squashdelta_SOURCES = \
-	src/squashdelta.cxx src/squashfs.cxx src/util.cxx
+	src/compressor.cxx \
+	src/squashdelta.cxx \
+	src/squashfs.cxx \
+	src/util.cxx
+
+squashdelta_LDADD = \
+	-llzo2
 
 EXTRA_DIST = NEWS
 NEWS: configure.ac Makefile.am

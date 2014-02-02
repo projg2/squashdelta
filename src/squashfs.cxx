@@ -83,10 +83,12 @@ size_t squashfs::inode::lreg::inode_size(uint32_t block_size, uint16_t block_log
 }
 
 InodeReader::InodeReader(const MMAPFile& new_file,
-		const struct squashfs::super_block& sb)
+		const struct squashfs::super_block& sb,
+		const Compressor& c)
 	: f(new_file), bufp(buf), buf_filled(0),
 	inode_num(0), no_inodes(sb.inodes),
-	block_size(sb.block_size), block_log(sb.block_log)
+	block_size(sb.block_size), block_log(sb.block_log),
+	compressor(c)
 {
 	f.seek(sb.inode_table_start);
 }
@@ -115,10 +117,11 @@ void InodeReader::poll_data()
 	}
 	else
 	{
-		// XXX: uncompress to buf
-		f.read_array<char>(length);
-
-		throw std::runtime_error("Inode decompression not implemented yet");
+		// uncompress to buf
+		// passing size of metadata_size since we don't expect a bigger
+		// output and we can guarantee that we have at least that much free
+		buf_filled += compressor.decompress(writep,
+				f.read_array<char>(length), length, squashfs::metadata_size);
 	}
 }
 
