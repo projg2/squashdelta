@@ -47,7 +47,12 @@ namespace squashfs
 	// bit fields
 	namespace inode_size
 	{
-		const uint16_t compressed = 1 << 15;
+		const uint16_t uncompressed = 1 << 15;
+	}
+
+	namespace block_size
+	{
+		const uint32_t uncompressed = 1 << 24;
 	}
 
 #	pragma pack(push, 1)
@@ -156,9 +161,10 @@ namespace squashfs
 			le32 offset;
 			le32 file_size;
 
-			//le16 block_list[0];
-			le16* block_list();
+			//le32 block_list[0];
+			le32* block_list();
 
+			uint32_t block_count(uint32_t block_size, uint16_t block_log);
 			size_t inode_size(uint32_t block_size, uint16_t block_log);
 		};
 
@@ -172,8 +178,8 @@ namespace squashfs
 			le32 offset;
 			le32 xattr;
 
-			//le16 block_list[0];
-			le16* block_list();
+			//le32 block_list[0];
+			le32* block_list();
 
 			size_t inode_size(uint32_t block_size, uint16_t block_log);
 		};

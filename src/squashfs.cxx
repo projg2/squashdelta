@@ -36,13 +36,14 @@ size_t squashfs::inode::symlink::inode_size()
 	return sizeof(*this) + symlink_size;
 }
 
-le16* squashfs::inode::reg::block_list()
+le32* squashfs::inode::reg::block_list()
 {
 	void* voidp = static_cast<void*>(this + 1);
-	return static_cast<le16*>(voidp);
+	return static_cast<le32*>(voidp);
 }
 
-size_t squashfs::inode::reg::inode_size(uint32_t block_size, uint16_t block_log)
+uint32_t squashfs::inode::reg::block_count(uint32_t block_size,
+		uint16_t block_log)
 {
 	uint32_t blocks = file_size;
 
@@ -53,13 +54,21 @@ size_t squashfs::inode::reg::inode_size(uint32_t block_size, uint16_t block_log)
 	// bytes -> blocks
 	blocks >>= block_log;
 
-	return sizeof(*this) + 2 * blocks * sizeof(le16);
+	return blocks;
 }
 
-le16* squashfs::inode::lreg::block_list()
+size_t squashfs::inode::reg::inode_size(uint32_t block_size,
+		uint16_t block_log)
+{
+	uint32_t blocks = block_count(block_size, block_log);
+
+	return sizeof(*this) + blocks * sizeof(le32);
+}
+
+le32* squashfs::inode::lreg::block_list()
 {
 	void* voidp = static_cast<void*>(this + 1);
-	return static_cast<le16*>(voidp);
+	return static_cast<le32*>(voidp);
 }
 
 struct squashfs::dir_index* squashfs::inode::ldir::index()
@@ -108,10 +117,10 @@ void InodeReader::poll_data()
 		writep = bufp + buf_filled;
 	}
 
-	if (length & squashfs::inode_size::compressed)
+	if (length & squashfs::inode_size::uncompressed)
 	{
 		// uncompressed inode
-		length &= ~squashfs::inode_size::compressed;
+		length &= ~squashfs::inode_size::uncompressed;
 		memcpy(writep, f.read_array<char>(length), length);
 		buf_filled += length;
 	}
