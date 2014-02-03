@@ -91,17 +91,45 @@ size_t squashfs::inode::lreg::inode_size(uint32_t block_size, uint16_t block_log
 	return sizeof(*this) + 2 * blocks * sizeof(le16);
 }
 
-MetadataReader::MetadataReader(const MMAPFile& new_file,
+MetadataBlockReader::MetadataBlockReader(const MMAPFile& new_file,
 		size_t offset, const Compressor& c)
-	: f(new_file), compressor(c),
-	bufp(buf), buf_filled(0), block_num(0)
+	: f(new_file), compressor(c)
 {
 	f.seek(offset, std::ios::beg);
 }
 
-void MetadataReader::poll_data()
+size_t MetadataBlockReader::read(void* dest, size_t dest_size)
 {
 	uint16_t length = f.read<le16>();
+
+	if (length & squashfs::inode_size::uncompressed)
+	{
+		// uncompressed block
+		length &= ~squashfs::inode_size::uncompressed;
+
+		if (length > dest_size)
+			throw std::logic_error("Output buffer too small for the metadata");
+
+		memcpy(dest, f.read_array<char>(length), length);
+		return length;
+	}
+	else
+	{
+		// uncompress to buf
+		return compressor.decompress(dest,
+				f.read_array<char>(length), length, dest_size);
+	}
+}
+
+MetadataReader::MetadataReader(const MMAPFile& new_file,
+		size_t offset, const Compressor& c)
+	: f(new_file, offset, c),
+	bufp(buf), buf_filled(0), block_num(0)
+{
+}
+
+void MetadataReader::poll_data()
+{
 	char* writep = bufp + buf_filled;
 
 	// if we're past half buffer, shift it
@@ -114,21 +142,9 @@ void MetadataReader::poll_data()
 		writep = bufp + buf_filled;
 	}
 
-	if (length & squashfs::inode_size::uncompressed)
-	{
-		// uncompressed inode
-		length &= ~squashfs::inode_size::uncompressed;
-		memcpy(writep, f.read_array<char>(length), length);
-		buf_filled += length;
-	}
-	else
-	{
-		// uncompress to buf
-		// passing size of metadata_size since we don't expect a bigger
-		// output and we can guarantee that we have at least that much free
-		buf_filled += compressor.decompress(writep,
-				f.read_array<char>(length), length, squashfs::metadata_size);
-	}
+	// passing size of metadata_size since we don't expect a bigger
+	// output and we can guarantee that we have at least that much free
+	buf_filled += f.read(writep, squashfs::metadata_size);
 
 	++block_num;
 }

@@ -224,10 +224,21 @@ namespace squashfs
 #	pragma pack(pop)
 }
 
-class MetadataReader
+class MetadataBlockReader
 {
 	MMAPFile f;
 	const Compressor& compressor;
+
+public:
+	MetadataBlockReader(const MMAPFile& new_file,
+			size_t offset, const Compressor& c);
+
+	size_t read(void* dest, size_t dest_size);
+};
+
+class MetadataReader
+{
+	MetadataBlockReader f;
 
 	char buf[2 * squashfs::metadata_size];
 	char* bufp;
