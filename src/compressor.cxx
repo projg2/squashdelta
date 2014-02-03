@@ -32,7 +32,7 @@ size_t LZOCompressor::decompress(void* dest, const void* src,
 
 	lzo_uint out_bytes = out_size;
 
-	if (lzo1x_decompress(src2, length, dest2, &out_bytes, 0) != LZO_E_OK)
+	if (lzo1x_decompress_safe(src2, length, dest2, &out_bytes, 0) != LZO_E_OK)
 		throw std::runtime_error("LZO decompression failed (corrupted data?)");
 
 	return out_bytes;
