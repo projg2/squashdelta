@@ -8,6 +8,7 @@
 #define SDT_UTIL_HXX 1
 
 #include <cstdlib> // size_t (maybe take it from somewhere else?)
+#include <ios>
 #include <stdexcept>
 #include <string>
 
@@ -94,7 +95,8 @@ public:
 	template <class T>
 	const T* read_array(size_t n);
 
-	void seek(size_t offset);
+	void seek(ssize_t offset,
+			std::ios_base::seekdir whence = std::ios_base::cur);
 };
 
 template <class T>

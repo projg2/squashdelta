@@ -28,7 +28,7 @@ IOError::IOError(const char* text, int new_errno)
 }
 
 MMAPFile::MMAPFile()
-	: fd(-1), pos(0), data(0)
+	: fd(-1), pos(0), length(0), data(0)
 {
 }
 
@@ -36,7 +36,7 @@ MMAPFile::MMAPFile()
 MMAPFile::MMAPFile(const MMAPFile& ref)
 	// just copy the data necessary for read/seek
 	// but not the one needed to close/unmap
-	: fd(-1), pos(ref.pos), end(ref.end), data(0)
+	: fd(-1), pos(ref.pos), end(ref.end), length(0), data(ref.data)
 {
 }
 
@@ -78,11 +78,12 @@ void MMAPFile::close()
 	bool munmap_failed = false;
 	bool close_failed = false;
 
-	if (data)
+	if (data && length > 0)
 	{
 		if (::munmap(data, length) == -1)
 			munmap_failed = true;
 		data = 0;
+		length = 0;
 		pos = 0;
 	}
 
@@ -101,10 +102,31 @@ void MMAPFile::close()
 		throw IOError("Unable to close file", errno);
 }
 
-void MMAPFile::seek(size_t offset)
+void MMAPFile::seek(ssize_t offset, std::ios_base::seekdir whence)
 {
-	if (!pos || pos + offset > end)
+	char* newpos;
+
+	if (!data)
+		throw std::logic_error("Seeking closed file");
+
+	switch (whence)
+	{
+		case std::ios::beg:
+			newpos = static_cast<char*>(data);
+			break;
+		case std::ios::cur:
+			newpos = pos;
+			break;
+		case std::ios::end:
+			newpos = end;
+			break;
+		default:
+			throw std::logic_error("Invalid value for whence");
+	}
+
+	newpos += offset;
+	if (newpos > end)
 		throw std::runtime_error("EOF while seeking");
 
-	pos += offset;
+	pos = newpos;
 }

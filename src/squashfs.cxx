@@ -97,7 +97,7 @@ MetadataReader::MetadataReader(const MMAPFile& new_file,
 	: f(new_file), compressor(c),
 	bufp(buf), buf_filled(0)
 {
-	f.seek(sb.inode_table_start);
+	f.seek(sb.inode_table_start, std::ios::beg);
 }
 
 void MetadataReader::poll_data()
