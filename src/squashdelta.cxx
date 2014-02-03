@@ -108,8 +108,34 @@ int main(int argc, char* argv[])
 				}
 			}
 
+			size_t block_num = ir.block_num();
 			std::cerr << "Read " << sb.inodes << " inodes in "
-				<< ir.block_num() << " blocks.\n";
+				<< block_num << " blocks.\n";
+
+			// record inode blocks
+
+			const char* data_start = static_cast<const char*>(f.data);
+
+			MetadataBlockReader mir(f, sb.inode_table_start, *c);
+			for (size_t i = 0; i < block_num; ++i)
+			{
+				const void* data;
+				size_t length;
+				bool compressed;
+
+				mir.read_input_block(data, length, compressed);
+
+				if (compressed)
+				{
+					const char* data_pos = static_cast<const char*>(data);
+
+					struct compressed_block block;
+					block.offset = data_pos - data_start;
+					block.length = length;
+
+					compressed_blocks.push_back(block);
+				}
+			}
 
 			delete c;
 		}

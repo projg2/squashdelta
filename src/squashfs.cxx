@@ -100,25 +100,36 @@ MetadataBlockReader::MetadataBlockReader(const MMAPFile& new_file,
 
 size_t MetadataBlockReader::read(void* dest, size_t dest_size)
 {
-	uint16_t length = f.read<le16>();
+	bool compressed;
+	size_t length;
+	const void* data;
 
-	if (length & squashfs::inode_size::uncompressed)
+	read_input_block(data, length, compressed);
+
+	if (!compressed)
 	{
 		// uncompressed block
-		length &= ~squashfs::inode_size::uncompressed;
-
 		if (length > dest_size)
 			throw std::logic_error("Output buffer too small for the metadata");
 
-		memcpy(dest, f.read_array<char>(length), length);
+		memcpy(dest, data, length);
 		return length;
 	}
 	else
 	{
 		// uncompress to buf
-		return compressor.decompress(dest,
-				f.read_array<char>(length), length, dest_size);
+		return compressor.decompress(dest, data, length, dest_size);
 	}
+}
+
+void MetadataBlockReader::read_input_block(const void*& data,
+		size_t& length, bool& compressed)
+{
+	uint16_t block_size = f.read<le16>();
+
+	length = block_size & ~squashfs::inode_size::uncompressed;
+	compressed = !(block_size & squashfs::inode_size::uncompressed);
+	data = f.read_array<char>(length);
 }
 
 MetadataReader::MetadataReader(const MMAPFile& new_file,
