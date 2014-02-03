@@ -10,9 +10,10 @@
 
 #include <iostream>
 #include <iomanip>
+#include <list>
+
 #include <cstdio>
 #include <cstring>
-#include <list>
 
 #include "compressor.hxx"
 #include "squashfs.hxx"
@@ -70,6 +71,9 @@ int main(int argc, char* argv[])
 
 			std::list<struct compressed_block> compressed_blocks;
 
+			std::cerr << "Input: " << input_file << "\n";
+			std::cerr << "Reading inodes..." << std::endl;
+
 			InodeReader ir(f, sb, *c);
 
 			for (uint32_t i = 0; i < sb.inodes; ++i)
@@ -103,6 +107,9 @@ int main(int argc, char* argv[])
 					}
 				}
 			}
+
+			std::cerr << "Read " << sb.inodes << " inodes in "
+				<< ir.block_num() << " blocks.\n";
 
 			delete c;
 		}

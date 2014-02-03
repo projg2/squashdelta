@@ -236,6 +236,8 @@ class MetadataReader
 	void poll_data();
 
 public:
+	size_t block_num;
+
 	MetadataReader(const MMAPFile& new_file,
 			const struct squashfs::super_block& sb,
 			const Compressor& c);
@@ -259,6 +261,8 @@ public:
 		const Compressor& c);
 
 	union squashfs::inode::inode& read();
+
+	size_t block_num();
 };
 
 #endif /*!SDT_SQUASHFS_HXX*/

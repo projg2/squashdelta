@@ -95,7 +95,7 @@ MetadataReader::MetadataReader(const MMAPFile& new_file,
 		const struct squashfs::super_block& sb,
 		const Compressor& c)
 	: f(new_file), compressor(c),
-	bufp(buf), buf_filled(0)
+	bufp(buf), buf_filled(0), block_num(0)
 {
 	f.seek(sb.inode_table_start, std::ios::beg);
 }
@@ -130,6 +130,8 @@ void MetadataReader::poll_data()
 		buf_filled += compressor.decompress(writep,
 				f.read_array<char>(length), length, squashfs::metadata_size);
 	}
+
+	++block_num;
 }
 
 void* MetadataReader::peek(size_t length)
@@ -277,4 +279,9 @@ union squashfs::inode::inode& InodeReader::read()
 	++inode_num;
 
 	return *static_cast<union squashfs::inode::inode*>(ret);
+}
+
+size_t InodeReader::block_num()
+{
+	return f.block_num;
 }
