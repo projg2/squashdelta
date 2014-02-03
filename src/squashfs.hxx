@@ -239,8 +239,7 @@ public:
 	size_t block_num;
 
 	MetadataReader(const MMAPFile& new_file,
-			const struct squashfs::super_block& sb,
-			const Compressor& c);
+			size_t offset, const Compressor& c);
 
 	void* peek(size_t length);
 	void seek(size_t length);

@@ -92,12 +92,11 @@ size_t squashfs::inode::lreg::inode_size(uint32_t block_size, uint16_t block_log
 }
 
 MetadataReader::MetadataReader(const MMAPFile& new_file,
-		const struct squashfs::super_block& sb,
-		const Compressor& c)
+		size_t offset, const Compressor& c)
 	: f(new_file), compressor(c),
 	bufp(buf), buf_filled(0), block_num(0)
 {
-	f.seek(sb.inode_table_start, std::ios::beg);
+	f.seek(offset, std::ios::beg);
 }
 
 void MetadataReader::poll_data()
@@ -151,7 +150,7 @@ void MetadataReader::seek(size_t length)
 InodeReader::InodeReader(const MMAPFile& new_file,
 		const struct squashfs::super_block& sb,
 		const Compressor& c)
-	: f(new_file, sb, c),
+	: f(new_file, sb.inode_table_start, c),
 	inode_num(0), no_inodes(sb.inodes),
 	block_size(sb.block_size), block_log(sb.block_log)
 {
