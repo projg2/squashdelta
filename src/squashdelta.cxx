@@ -12,10 +12,18 @@
 #include <iomanip>
 #include <cstdio>
 #include <cstring>
+#include <list>
 
 #include "compressor.hxx"
 #include "squashfs.hxx"
 #include "util.hxx"
+
+struct compressed_block
+{
+	size_t offset;
+	size_t length;
+	// XXX: checksum
+};
 
 int main(int argc, char* argv[])
 {
@@ -60,10 +68,41 @@ int main(int argc, char* argv[])
 					return 1;
 			}
 
+			std::list<struct compressed_block> compressed_blocks;
+
 			InodeReader ir(f, sb, *c);
 
 			for (uint32_t i = 0; i < sb.inodes; ++i)
-				ir.read();
+			{
+				union squashfs::inode::inode& in = ir.read();
+
+				if (in.as_base.inode_type == squashfs::inode::type::reg)
+				{
+					uint32_t pos = in.as_reg.start_block;
+					le32* block_list = in.as_reg.block_list();
+
+					for (uint32_t j = 0;
+							j < in.as_reg.block_count(sb.block_size, sb.block_log);
+							++j)
+					{
+						if (block_list[j] & squashfs::block_size::uncompressed)
+						{
+							// seek over the uncompressed block
+							pos += (block_list[j] & ~squashfs::block_size::uncompressed);
+						}
+						else
+						{
+							// record the compressed block
+							struct compressed_block block;
+							block.offset = pos;
+							block.length = block_list[j];
+
+							compressed_blocks.push_back(block);
+							pos += block.length;
+						}
+					}
+				}
+			}
 
 			delete c;
 		}
