@@ -224,21 +224,34 @@ namespace squashfs
 #	pragma pack(pop)
 }
 
-class InodeReader
+class MetadataReader
 {
 	MMAPFile f;
-	char buf[2*squashfs::metadata_size];
+	const Compressor& compressor;
+
+	char buf[2 * squashfs::metadata_size];
 	char* bufp;
 	size_t buf_filled;
+
+	void poll_data();
+
+public:
+	MetadataReader(const MMAPFile& new_file,
+			const struct squashfs::super_block& sb,
+			const Compressor& c);
+
+	void* peek(size_t length);
+	void seek(size_t length);
+};
+
+class InodeReader
+{
+	MetadataReader f;
 
 	uint32_t inode_num;
 	uint32_t no_inodes;
 	uint32_t block_size;
 	uint16_t block_log;
-
-	const Compressor& compressor;
-
-	void poll_data();
 
 public:
 	InodeReader(const MMAPFile& new_file,

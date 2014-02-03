@@ -91,18 +91,16 @@ size_t squashfs::inode::lreg::inode_size(uint32_t block_size, uint16_t block_log
 	return sizeof(*this) + 2 * blocks * sizeof(le16);
 }
 
-InodeReader::InodeReader(const MMAPFile& new_file,
+MetadataReader::MetadataReader(const MMAPFile& new_file,
 		const struct squashfs::super_block& sb,
 		const Compressor& c)
-	: f(new_file), bufp(buf), buf_filled(0),
-	inode_num(0), no_inodes(sb.inodes),
-	block_size(sb.block_size), block_log(sb.block_log),
-	compressor(c)
+	: f(new_file), compressor(c),
+	bufp(buf), buf_filled(0)
 {
 	f.seek(sb.inode_table_start);
 }
 
-void InodeReader::poll_data()
+void MetadataReader::poll_data()
 {
 	uint16_t length = f.read<le16>();
 	char* writep = bufp + buf_filled;
@@ -134,16 +132,36 @@ void InodeReader::poll_data()
 	}
 }
 
+void* MetadataReader::peek(size_t length)
+{
+	while (buf_filled < length)
+		poll_data();
+
+	return static_cast<void*>(bufp);
+}
+
+void MetadataReader::seek(size_t length)
+{
+	bufp += length;
+	buf_filled -= length;
+}
+
+InodeReader::InodeReader(const MMAPFile& new_file,
+		const struct squashfs::super_block& sb,
+		const Compressor& c)
+	: f(new_file, sb, c),
+	inode_num(0), no_inodes(sb.inodes),
+	block_size(sb.block_size), block_log(sb.block_log)
+{
+}
+
 union squashfs::inode::inode& InodeReader::read()
 {
 	if (inode_num >= no_inodes+1)
 		throw std::runtime_error("Trying to read past last inode");
 
 	// start with inode 'header' size
-	if (buf_filled < sizeof(squashfs::inode::base))
-		poll_data();
-
-	void* ret = static_cast<void*>(bufp);
+	void* ret = f.peek(sizeof(squashfs::inode::base));
 	struct squashfs::inode::base* in = static_cast<squashfs::inode::base*>(ret);
 
 	// get the actual type-specific inode size
@@ -186,12 +204,8 @@ union squashfs::inode::inode& InodeReader::read()
 	if (!in->inode_type || in->inode_type > squashfs::inode::type::lsocket)
 		throw std::runtime_error("Invalid inode type");
 
-	if (buf_filled < inode_len)
-	{
-		poll_data();
-		ret = static_cast<void*>(bufp);
-		in = static_cast<squashfs::inode::base*>(ret);
-	}
+	ret = f.peek(inode_len);
+	in = static_cast<squashfs::inode::base*>(ret);
 
 	// now consider the inodes with dynamic sizes
 	switch (in->inode_type)
@@ -231,12 +245,9 @@ union squashfs::inode::inode& InodeReader::read()
 				break;
 			}
 	}
-	if (buf_filled < inode_len)
-	{
-		poll_data();
-		ret = static_cast<void*>(bufp);
-		in = static_cast<squashfs::inode::base*>(ret);
-	}
+
+	ret = f.peek(inode_len);
+	in = static_cast<squashfs::inode::base*>(ret);
 
 	if (in->inode_type == squashfs::inode::type::ldir)
 	{
@@ -247,26 +258,22 @@ union squashfs::inode::inode& InodeReader::read()
 		size_t offset = sizeof(struct squashfs::inode::ldir);
 		for (int i = 0; i < in2->i_count; ++i)
 		{
-			void* voidp = static_cast<void*>(bufp + offset);
+			char* charp = static_cast<char*>(ret) + offset;
+			void* voidp = static_cast<void*>(charp);
 			struct squashfs::dir_index* idx
 				= static_cast<struct squashfs::dir_index*>(voidp);
 
 			// size is length-1... for some smart reason
 			inode_len += idx->size + 1;
 			offset += idx->size + 1 + sizeof(struct squashfs::dir_index);
-			if (buf_filled < inode_len)
-			{
-				poll_data();
-				ret = static_cast<void*>(bufp);
-				in = static_cast<squashfs::inode::base*>(ret);
-				in2 = static_cast<struct squashfs::inode::ldir*>(ret);
-			}
+
+			ret = f.peek(inode_len);
+			in2 = static_cast<struct squashfs::inode::ldir*>(ret);
 		}
 	}
 
 	// seek towards the next inode
-	bufp += inode_len;
-	buf_filled -= inode_len;
+	f.seek(inode_len);
 	++inode_num;
 
 	return *static_cast<union squashfs::inode::inode*>(ret);
