@@ -12,8 +12,17 @@
 #include <list>
 #include <typeinfo>
 
+#include <cerrno>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
+
+extern "C"
+{
+#	include <sys/types.h>
+#	include <sys/wait.h>
+#	include <unistd.h>
+}
 
 #include "compressor.hxx"
 #include "hash.hxx"
@@ -24,6 +33,7 @@ struct compressed_block
 {
 	size_t offset;
 	size_t length;
+	size_t uncompressed_length;
 	uint32_t hash;
 };
 
@@ -218,117 +228,277 @@ std::list<struct compressed_block> get_blocks(MMAPFile& f, Compressor*& c)
 	return compressed_data_blocks;
 }
 
+void write_unpacked_file(SparseFileWriter& outf, MMAPFile& inf,
+		std::list<struct compressed_block> cb, Compressor& c)
+{
+	size_t prev_offset = 0;
+	inf.seek(0, std::ios::beg);
+
+	for (std::list<struct compressed_block>::iterator i = cb.begin();
+			i != cb.end(); ++i)
+	{
+		size_t pre_length = (*i).offset - prev_offset;
+		prev_offset = (*i).offset + (*i).length;
+
+		// first, copy the data preceeding compressed block
+		outf.write(inf.read_array<char>(pre_length), pre_length);
+
+		// then, seek through the block
+		inf.seek((*i).length);
+		outf.write_sparse(pre_length);
+	}
+
+	for (std::list<struct compressed_block>::iterator i = cb.begin();
+			i != cb.end(); ++i)
+	{
+		char buf[1000000];
+		size_t unc_length;
+
+		inf.seek((*i).offset, std::ios::beg);
+		unc_length = c.decompress(buf, inf.read_array<char>((*i).length),
+				(*i).length, sizeof(buf));
+
+		(*i).uncompressed_length = unc_length;
+		outf.write(buf, unc_length);
+	}
+}
+
 int main(int argc, char* argv[])
 {
-	if (argc < 3)
+	if (argc < 4)
 	{
-		std::cerr << "Usage: " << argv[0] << " <source> <target>\n";
+		std::cerr << "Usage: " << argv[0] << " <source> <target> <patch-output>\n";
 		return 1;
 	}
 
 	const char* source_file = argv[1];
 	const char* target_file = argv[2];
-
-	MMAPFile source_f, target_f;
-
-	std::list<struct compressed_block> source_blocks;
-	std::list<struct compressed_block> target_blocks;
-
-	Compressor* c = 0;
+	const char* patch_file = argv[3];
 
 	try
 	{
-		source_f.open(source_file);
-		std::cerr << "Source: " << source_file << "\n";
-		source_blocks = get_blocks(source_f, c);
-	}
-	catch (IOError& e)
-	{
-		std::cerr << "Program terminated abnormally:\n\t"
-			<< e.what() << "\n\tat file: " << source_file
-			<< "\n\terrno: " << strerror(e.errno_val) << "\n";
-		if (c)
+		MMAPFile source_f, target_f;
+
+		std::list<struct compressed_block> source_blocks;
+		std::list<struct compressed_block> target_blocks;
+
+		Compressor* c = 0;
+
+		try
+		{
+			source_f.open(source_file);
+			std::cerr << "Source: " << source_file << "\n";
+			source_blocks = get_blocks(source_f, c);
+		}
+		catch (IOError& e)
+		{
+			std::cerr << "Program terminated abnormally:\n\t"
+				<< e.what() << "\n\tat file: " << source_file
+				<< "\n\terrno: " << strerror(e.errno_val) << "\n";
+			if (c)
+				delete c;
+			return 1;
+		}
+		catch (std::exception& e)
+		{
+			std::cerr << "Program terminated abnormally:\n\t"
+				<< e.what() << "\n\tat file: " << source_file << "\n";
+			if (c)
+				delete c;
+			return 1;
+		}
+
+		std::cerr << "\n";
+
+		try
+		{
+			target_f.open(target_file);
+			std::cerr << "Target: " << target_file << "\n";
+			target_blocks = get_blocks(target_f, c);
+		}
+		catch (IOError& e)
+		{
+			std::cerr << "Program terminated abnormally:\n\t"
+				<< e.what() << "\n\tat file: " << source_file
+				<< "\n\terrno: " << strerror(e.errno_val) << "\n";
 			delete c;
-		return 1;
-	}
-	catch (std::exception& e)
-	{
-		std::cerr << "Program terminated abnormally:\n\t"
-			<< e.what() << "\n\tat file: " << source_file << "\n";
-		if (c)
+			return 1;
+		}
+		catch (std::exception& e)
+		{
+			std::cerr << "Program terminated abnormally:\n\t"
+				<< e.what() << "\n\tat file: " << source_file << "\n";
 			delete c;
-		return 1;
-	}
+			return 1;
+		}
 
-	std::cerr << "\n";
+		std::cerr << "\n";
 
-	try
-	{
-		target_f.open(target_file);
-		std::cerr << "Target: " << target_file << "\n";
-		target_blocks = get_blocks(target_f, c);
-	}
-	catch (IOError& e)
-	{
-		std::cerr << "Program terminated abnormally:\n\t"
-			<< e.what() << "\n\tat file: " << source_file
-			<< "\n\terrno: " << strerror(e.errno_val) << "\n";
+		source_blocks.sort(sort_by_len_hash);
+		target_blocks.sort(sort_by_len_hash);
+
+		for (std::list<struct compressed_block>::iterator
+				i = source_blocks.begin(),
+				j = target_blocks.begin();
+				i != source_blocks.end() && j != target_blocks.end();)
+		{
+			// seek until we find duplicates
+			if ((*i).length < (*j).length)
+				++i;
+			else if ((*j).length < (*i).length)
+				++j;
+			else if ((*i).hash < (*j).hash)
+				++i;
+			else if ((*j).hash < (*i).hash)
+				++j;
+			else
+			{
+				// found a match, remove the blocks then
+				std::list<struct compressed_block>::iterator
+					i_st = i, j_st = j;
+
+				// remove consecutive duplicates as well
+				while (i != source_blocks.end()
+						&& (*i).length == (*i_st).length
+						&& (*i).hash == (*i_st).hash)
+					++i;
+				while (j != target_blocks.end()
+						&& (*j).length == (*j_st).length
+						&& (*j).hash == (*j_st).hash)
+					++j;
+
+				source_blocks.erase(i_st, i);
+				target_blocks.erase(j_st, j);
+			}
+		}
+
+		std::cerr << "Unique blocks found: "
+			<< source_blocks.size() << " in source and "
+			<< target_blocks.size() << " in target.\n";
+
+		// now we need to write the expanded files
+
+		source_blocks.sort(sort_by_offset);
+		target_blocks.sort(sort_by_offset);
+
+		// open output before changing cwd
+		SparseFileWriter patch_out;
+		patch_out.open(patch_file);
+
+		const char* tmpdir = getenv("TMPDIR");
+#ifdef _P_tmpdir
+		if (!tmpdir)
+			tmpdir = P_tmpdir;
+#endif
+		if (!tmpdir)
+			tmpdir = "/tmp";
+
+		if (chdir(tmpdir) == -1)
+		{
+			std::cerr << "Unable to chdir() into temporary directory\n"
+				"\tDirectory: " << tmpdir << "\n";
+			delete c;
+			return 1;
+		}
+
+		TemporarySparseFileWriter source_temp, target_temp;
+		try
+		{
+			std::cerr << "Writing expanded source file..." << std::endl;
+
+			source_temp.open(source_f.length);
+			write_unpacked_file(source_temp, source_f, source_blocks, *c);
+		}
+		catch (IOError& e)
+		{
+			std::cerr << "Program terminated abnormally:\n\t"
+				<< e.what() << "\n\tat temporary file for source"
+				<< "\n\terrno: " << strerror(e.errno_val) << "\n";
+			delete c;
+			return 1;
+		}
+		catch (std::exception& e)
+		{
+			std::cerr << "Program terminated abnormally:\n\t"
+				<< e.what() << "\n\tat temporary file for source\n";
+			delete c;
+			return 1;
+		}
+
+		try
+		{
+			std::cerr << "Writing expanded target file..." << std::endl;
+
+			target_temp.open(target_f.length);
+			write_unpacked_file(target_temp, target_f, target_blocks, *c);
+		}
+		catch (IOError& e)
+		{
+			std::cerr << "Program terminated abnormally:\n\t"
+				<< e.what() << "\n\tat temporary file for target"
+				<< "\n\terrno: " << strerror(e.errno_val) << "\n";
+			delete c;
+			return 1;
+		}
+		catch (std::exception& e)
+		{
+			std::cerr << "Program terminated abnormally:\n\t"
+				<< e.what() << "\n\tat temporary file for target\n";
+			delete c;
+			return 1;
+		}
+
+		// TODO: write block list
+
 		delete c;
-		return 1;
-	}
-	catch (std::exception& e)
-	{
-		std::cerr << "Program terminated abnormally:\n\t"
-			<< e.what() << "\n\tat file: " << source_file << "\n";
-		delete c;
-		return 1;
-	}
 
-	std::cerr << "\n";
+		std::cerr << "Calling xdelta to generate the diff..." << std::endl;
 
-	source_blocks.sort(sort_by_len_hash);
-	target_blocks.sort(sort_by_len_hash);
+		pid_t child = fork();
+		if (child == -1)
+			throw IOError("fork() failed", errno);
+		if (child == 0)
+		{
+			try
+			{
+				// in child
+				if (close(1) == -1)
+					throw IOError("Unable to close stdout", errno);
+				if (dup2(patch_out.fd, 1) == -1)
+					throw IOError("Unable to override stdout via dup2()", errno);
 
-	for (std::list<struct compressed_block>::iterator
-			i = source_blocks.begin(),
-			j = target_blocks.begin();
-			i != source_blocks.end() && j != target_blocks.end();)
-	{
-		// seek until we find duplicates
-		if ((*i).length < (*j).length)
-			++i;
-		else if ((*j).length < (*i).length)
-			++j;
-		else if ((*i).hash < (*j).hash)
-			++i;
-		else if ((*j).hash < (*i).hash)
-			++j;
+				if (execlp("xdelta3",
+						"xdelta3", "-v", "-9", "-S", "djw",
+						"-s", source_temp.name(), target_temp.name(), 0) == -1)
+					throw IOError("execlp() failed", errno);
+			}
+			catch (IOError& e)
+			{
+				std::cerr << "Error occured in child process:\n\t"
+					<< e.what() << "\n\terrno: " << strerror(e.errno_val) << "\n";
+				return 1;
+			}
+		}
 		else
 		{
-			// found a match, remove the blocks then
-			std::list<struct compressed_block>::iterator
-				i_st = i, j_st = j;
+			int status;
 
-			// remove consecutive duplicates as well
-			while (i != source_blocks.end()
-					&& (*i).length == (*i_st).length
-					&& (*i).hash == (*i_st).hash)
-				++i;
-			while (j != target_blocks.end()
-					&& (*j).length == (*j_st).length
-					&& (*j).hash == (*j_st).hash)
-				++j;
+			waitpid(child, &status, 0);
 
-			source_blocks.erase(i_st, i);
-			target_blocks.erase(j_st, j);
+			if (WEXITSTATUS(status) != 0)
+			{
+				std::cerr << "Child process terminate with error status\n"
+					"\treturn code: " << WEXITSTATUS(status) << "\n";
+				return 1;
+			}
 		}
 	}
-
-	std::cerr << "Unique blocks found: "
-		<< source_blocks.size() << " in source and "
-		<< target_blocks.size() << " in target.\n";
-
-	delete c;
+	catch (IOError& e)
+	{
+		std::cerr << "Error occured:\n\t"
+			<< e.what() << "\n\terrno: " << strerror(e.errno_val) << "\n";
+		return 1;
+	}
 
 	return 0;
 }

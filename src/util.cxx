@@ -9,6 +9,7 @@
 #endif
 
 #include <cerrno>
+#include <cstring>
 
 extern "C"
 {
@@ -129,4 +130,86 @@ void MMAPFile::seek(ssize_t offset, std::ios_base::seekdir whence)
 		throw std::runtime_error("EOF while seeking");
 
 	pos = newpos;
+}
+
+SparseFileWriter::SparseFileWriter()
+	: offset(0), fd(-1)
+{
+}
+
+SparseFileWriter::~SparseFileWriter()
+{
+	if (fd != -1)
+	{
+		if (::close(fd) == -1)
+			throw IOError("close() failed", errno);
+	}
+}
+
+void SparseFileWriter::open(const char* path, off_t expected_size)
+{
+	unlink(path);
+	fd = creat(path, 0600);
+	if (fd == -1)
+		throw IOError("Unable to create file", errno);
+
+	if (expected_size > 0)
+		posix_fallocate(fd, 0, expected_size);
+}
+
+void SparseFileWriter::write(const void* data, size_t length)
+{
+	const char* buf = static_cast<const char*>(data);
+
+	while (length > 0)
+	{
+		ssize_t ret = ::write(fd, buf, length);
+
+		if (ret == -1)
+			throw IOError("write() failed", errno);
+		length -= ret;
+		buf += ret;
+		offset += ret;
+	}
+}
+
+void SparseFileWriter::write_sparse(size_t length)
+{
+	off_t past = offset + length;
+
+	if (ftruncate(fd, past) == -1)
+		throw IOError("ftruncate() failed to extend the sparse file", errno);
+	if (lseek(fd, length, SEEK_CUR) == -1)
+		throw IOError("lseek() failed to seek past sparse block", errno);
+
+	offset = past;
+}
+
+TemporarySparseFileWriter::TemporarySparseFileWriter()
+{
+}
+
+TemporarySparseFileWriter::~TemporarySparseFileWriter()
+{
+	// unlink the file only in parent process
+	if (parent_pid == getpid() && unlink(name()) == -1)
+		throw IOError("Unable to unlink the temporary file", errno);
+}
+
+void TemporarySparseFileWriter::open(off_t expected_size)
+{
+	parent_pid = getpid();
+
+	strcpy(buf, tmpfile_template);
+	fd = mkstemp(buf);
+	if (fd == -1)
+		throw IOError("Unable to create a temporary file", errno);
+
+	if (expected_size > 0)
+		posix_fallocate(fd, 0, expected_size);
+}
+
+const char* TemporarySparseFileWriter::name()
+{
+	return buf;
 }

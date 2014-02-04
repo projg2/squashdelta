@@ -18,6 +18,7 @@
 
 extern "C"
 {
+#include <sys/types.h>
 #ifdef HAVE_STDINT_H
 #	include <stdint.h>
 #endif
@@ -128,5 +129,37 @@ const T* MMAPFile::read_array(size_t n)
 	seek(sizeof(T) * n);
 	return ret;
 }
+
+class SparseFileWriter
+{
+	off_t offset;
+
+public:
+	int fd;
+
+	SparseFileWriter();
+	virtual ~SparseFileWriter();
+
+	void open(const char* path, off_t expected_size = 0);
+
+	void write(const void* data, size_t length);
+	void write_sparse(size_t length);
+};
+
+static const char* tmpfile_template = "tmp.XXXXXX";
+
+class TemporarySparseFileWriter : public SparseFileWriter
+{
+	char buf[sizeof(tmpfile_template) + 1];
+	pid_t parent_pid;
+
+public:
+	TemporarySparseFileWriter();
+	virtual ~TemporarySparseFileWriter();
+
+	void open(off_t expected_size = 0);
+
+	const char* name();
+};
 
 #endif /*!SDT_UTIL_HXX*/
