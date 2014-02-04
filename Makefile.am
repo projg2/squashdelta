@@ -2,6 +2,7 @@ bin_PROGRAMS = squashdelta
 
 squashdelta_SOURCES = \
 	src/compressor.cxx \
+	src/hash.cxx \
 	src/squashdelta.cxx \
 	src/squashfs.cxx \
 	src/util.cxx

@@ -15,6 +15,7 @@
 #include <cstring>
 
 #include "compressor.hxx"
+#include "hash.hxx"
 #include "squashfs.hxx"
 #include "util.hxx"
 
@@ -22,8 +23,23 @@ struct compressed_block
 {
 	size_t offset;
 	size_t length;
-	// XXX: checksum
+	uint32_t hash;
 };
+
+bool sort_by_offset(const struct compressed_block& lhs,
+		const struct compressed_block& rhs)
+{
+	return lhs.offset < rhs.offset;
+}
+
+bool sort_by_len_hash(const struct compressed_block& lhs,
+		const struct compressed_block& rhs)
+{
+	if (lhs.length == rhs.length)
+		return lhs.hash < rhs.hash;
+	return lhs.length < rhs.length;
+}
+
 
 std::list<struct compressed_block> get_blocks(const char* path)
 {
@@ -55,7 +71,9 @@ std::list<struct compressed_block> get_blocks(const char* path)
 
 	try
 	{
-		std::list<struct compressed_block> compressed_blocks;
+		std::list<struct compressed_block>
+			compressed_metadata_blocks,
+			compressed_data_blocks;
 
 		std::cerr << "Reading inodes..." << std::endl;
 
@@ -86,7 +104,7 @@ std::list<struct compressed_block> get_blocks(const char* path)
 						block.offset = pos;
 						block.length = block_list[j];
 
-						compressed_blocks.push_back(block);
+						compressed_data_blocks.push_back(block);
 						pos += block.length;
 					}
 				}
@@ -98,6 +116,9 @@ std::list<struct compressed_block> get_blocks(const char* path)
 			<< block_num << " blocks.\n";
 
 		// record inode blocks
+
+		std::cerr << "Hashing " << block_num
+			<< " inode blocks..." << std::endl;
 
 		const char* data_start = static_cast<const char*>(f.data);
 
@@ -117,8 +138,9 @@ std::list<struct compressed_block> get_blocks(const char* path)
 				struct compressed_block block;
 				block.offset = data_pos - data_start;
 				block.length = length;
+				block.hash = murmurhash3(data, length, 0);
 
-				compressed_blocks.push_back(block);
+				compressed_metadata_blocks.push_back(block);
 			}
 		}
 
@@ -137,7 +159,7 @@ std::list<struct compressed_block> get_blocks(const char* path)
 				block.offset = fe.start_block;
 				block.length = fe.size;
 
-				compressed_blocks.push_back(block);
+				compressed_data_blocks.push_back(block);
 			}
 		}
 
@@ -146,6 +168,9 @@ std::list<struct compressed_block> get_blocks(const char* path)
 			<< block_num << " blocks.\n";
 
 		// record fragment table
+
+		std::cerr << "Hashing " << block_num
+			<< " fragment table blocks..." << std::endl;
 
 		MetadataBlockReader mfr(f, fr.start_offset, *c);
 		for (size_t i = 0; i < block_num; ++i)
@@ -163,17 +188,39 @@ std::list<struct compressed_block> get_blocks(const char* path)
 				struct compressed_block block;
 				block.offset = data_pos - data_start;
 				block.length = length;
+				block.hash = murmurhash3(data, length, 0);
 
-				compressed_blocks.push_back(block);
+				compressed_metadata_blocks.push_back(block);
 			}
 		}
 
-		std::cerr << "Total: " << compressed_blocks.size()
+		// sort by offset to use sequential reads
+		compressed_data_blocks.sort(sort_by_offset);
+
+		std::cerr << "Hashing " << compressed_data_blocks.size()
+			<< " data blocks..." << std::endl;
+		MMAPFile hf(f);
+
+		// record the checksums
+		for (std::list<struct compressed_block>::iterator
+				i = compressed_data_blocks.begin();
+				i != compressed_data_blocks.end();
+				++i)
+		{
+			hf.seek((*i).offset, std::ios::beg);
+			(*i).hash = murmurhash3(hf.read_array<uint8_t>((*i).length),
+					(*i).length, 0);
+		}
+
+		compressed_data_blocks.splice(compressed_data_blocks.end(),
+				compressed_metadata_blocks);
+
+		std::cerr << "Total: " << compressed_data_blocks.size()
 			<< " compressed blocks." << std::endl;
 
 		delete c;
 
-		return compressed_blocks;
+		return compressed_data_blocks;
 	}
 	catch (std::exception& e)
 	{
@@ -215,9 +262,11 @@ int main(int argc, char* argv[])
 		return 1;
 	}
 
+	std::cerr << "\n";
+
 	try
 	{
-		std::cerr << "Target: " << source_file << "\n";
+		std::cerr << "Target: " << target_file << "\n";
 		target_blocks = get_blocks(target_file);
 	}
 	catch (IOError& e)
@@ -233,6 +282,50 @@ int main(int argc, char* argv[])
 			<< e.what() << "\n\tat file: " << source_file << "\n";
 		return 1;
 	}
+
+	std::cerr << "\n";
+
+	source_blocks.sort(sort_by_len_hash);
+	target_blocks.sort(sort_by_len_hash);
+
+	for (std::list<struct compressed_block>::iterator
+			i = source_blocks.begin(),
+			j = target_blocks.begin();
+			i != source_blocks.end() && j != target_blocks.end();)
+	{
+		// seek until we find duplicates
+		if ((*i).length < (*j).length)
+			++i;
+		else if ((*j).length < (*i).length)
+			++j;
+		else if ((*i).hash < (*j).hash)
+			++i;
+		else if ((*j).hash < (*i).hash)
+			++j;
+		else
+		{
+			// found a match, remove the blocks then
+			std::list<struct compressed_block>::iterator
+				i_st = i, j_st = j;
+
+			// remove consecutive duplicates as well
+			while (i != source_blocks.end()
+					&& (*i).length == (*i_st).length
+					&& (*i).hash == (*i_st).hash)
+				++i;
+			while (j != target_blocks.end()
+					&& (*j).length == (*j_st).length
+					&& (*j).hash == (*j_st).hash)
+				++j;
+
+			source_blocks.erase(i_st, i);
+			target_blocks.erase(j_st, j);
+		}
+	}
+
+	std::cerr << "Unique blocks found: "
+		<< source_blocks.size() << " in source and "
+		<< target_blocks.size() << " in target.\n";
 
 	return 0;
 }
