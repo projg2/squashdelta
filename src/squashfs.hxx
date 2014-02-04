@@ -221,6 +221,12 @@ namespace squashfs
 		};
 	}
 
+	struct fragment_entry {
+		le64 start_block;
+		le32 size;
+		uint32_t unused;
+	};
+
 #	pragma pack(pop)
 }
 
@@ -273,6 +279,25 @@ public:
 		const Compressor& c);
 
 	union squashfs::inode::inode& read();
+
+	size_t block_num();
+};
+
+class FragmentTableReader
+{
+	MetadataReader f;
+
+	uint32_t entry_num;
+	uint32_t no_entries;
+
+public:
+	uint64_t start_offset;
+
+	FragmentTableReader(const MMAPFile& new_file,
+			const struct squashfs::super_block& sb,
+			const Compressor& c);
+
+	struct squashfs::fragment_entry& read();
 
 	size_t block_num();
 };

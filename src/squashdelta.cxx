@@ -9,7 +9,6 @@
 #endif
 
 #include <iostream>
-#include <iomanip>
 #include <list>
 
 #include <cstdio>
@@ -136,6 +135,55 @@ int main(int argc, char* argv[])
 					compressed_blocks.push_back(block);
 				}
 			}
+
+			// fragments
+			std::cerr << "Reading fragment table..." << std::endl;
+
+			FragmentTableReader fr(f, sb, *c);
+
+			for (uint32_t i = 0; i < sb.fragments; ++i)
+			{
+				struct squashfs::fragment_entry& fe = fr.read();
+
+				if (!(fe.size & squashfs::block_size::uncompressed))
+				{
+					struct compressed_block block;
+					block.offset = fe.start_block;
+					block.length = fe.size;
+
+					compressed_blocks.push_back(block);
+				}
+			}
+
+			block_num = fr.block_num();
+			std::cerr << "Read " << sb.fragments << " fragments in "
+				<< block_num << " blocks.\n";
+
+			// record fragment table
+
+			MetadataBlockReader mfr(f, fr.start_offset, *c);
+			for (size_t i = 0; i < block_num; ++i)
+			{
+				const void* data;
+				size_t length;
+				bool compressed;
+
+				mir.read_input_block(data, length, compressed);
+
+				if (compressed)
+				{
+					const char* data_pos = static_cast<const char*>(data);
+
+					struct compressed_block block;
+					block.offset = data_pos - data_start;
+					block.length = length;
+
+					compressed_blocks.push_back(block);
+				}
+			}
+
+			std::cerr << "Total: " << compressed_blocks.size()
+				<< " compressed blocks." << std::endl;
 
 			delete c;
 		}

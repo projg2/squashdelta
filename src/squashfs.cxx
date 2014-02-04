@@ -311,3 +311,41 @@ size_t InodeReader::block_num()
 {
 	return f.block_num;
 }
+
+static uint64_t get_fragment_table_offset(const MMAPFile& new_file,
+		const struct squashfs::super_block& sb)
+{
+	MMAPFile f = new_file;
+	f.seek(sb.fragment_table_start);
+	return f.read<le64>();
+}
+
+FragmentTableReader::FragmentTableReader(const MMAPFile& new_file,
+		const struct squashfs::super_block& sb,
+		const Compressor& c)
+	: f(new_file, get_fragment_table_offset(new_file, sb), c),
+	entry_num(0), no_entries(sb.fragments),
+	start_offset(get_fragment_table_offset(new_file, sb))
+{
+}
+
+struct squashfs::fragment_entry& FragmentTableReader::read()
+{
+	if (entry_num >= no_entries+1)
+		throw std::runtime_error("Trying to read past last fragment");
+
+	struct squashfs::fragment_entry* ret;
+
+	ret = static_cast<struct squashfs::fragment_entry*>(
+			f.peek(sizeof(*ret)));
+
+	f.seek(sizeof(*ret));
+	++entry_num;
+
+	return *ret;
+}
+
+size_t FragmentTableReader::block_num()
+{
+	return f.block_num;
+}
