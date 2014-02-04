@@ -6,8 +6,10 @@ squashdelta_SOURCES = \
 	src/squashfs.cxx \
 	src/util.cxx
 
+squashdelta_CPPFLAGS = \
+	$(LZO_CFLAGS)
 squashdelta_LDADD = \
-	-llzo2
+	$(LZO_LIBS)
 
 EXTRA_DIST = NEWS
 NEWS: configure.ac Makefile.am

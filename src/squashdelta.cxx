@@ -56,18 +56,21 @@ int main(int argc, char* argv[])
 
 		Compressor* c;
 
+		switch (sb.compression)
+		{
+			case squashfs::compression::lzo:
+#ifdef ENABLE_LZO
+				c = new LZOCompressor();
+#else
+				throw std::runtime_error("LZO compression support disabled at build time");
+#endif
+				break;
+			default:
+				throw std::runtime_error("Unsupported compression algorithm.");
+		}
+
 		try
 		{
-			switch (sb.compression)
-			{
-				case squashfs::compression::lzo:
-					c = new LZOCompressor();
-					break;
-				default:
-					std::cerr << "Unsupported compression algorithm.\n";
-					return 1;
-			}
-
 			std::list<struct compressed_block> compressed_blocks;
 
 			std::cerr << "Input: " << input_file << "\n";

@@ -19,6 +19,7 @@ public:
 			size_t length, size_t out_size) const = 0;
 };
 
+#ifdef ENABLE_LZO
 class LZOCompressor : public Compressor
 {
 public:
@@ -27,5 +28,6 @@ public:
 	virtual size_t decompress(void* dest, const void* src,
 			size_t length, size_t out_size) const;
 };
+#endif /*ENABLE_LZO*/
 
 #endif /*!SDT_COMPRESSOR_HXX*/

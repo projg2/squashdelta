@@ -18,6 +18,8 @@ Compressor::~Compressor()
 {
 }
 
+#ifdef ENABLE_LZO
+
 LZOCompressor::LZOCompressor()
 {
 	if (lzo_init() != LZO_E_OK)
@@ -37,3 +39,5 @@ size_t LZOCompressor::decompress(void* dest, const void* src,
 
 	return out_bytes;
 }
+
+#endif /*ENABLE_LZO*/
