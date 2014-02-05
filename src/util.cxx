@@ -148,7 +148,6 @@ SparseFileWriter::~SparseFileWriter()
 
 void SparseFileWriter::open(const char* path, off_t expected_size)
 {
-	unlink(path);
 	fd = creat(path, 0600);
 	if (fd == -1)
 		throw IOError("Unable to create file", errno);
