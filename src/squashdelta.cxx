@@ -271,7 +271,7 @@ void write_unpacked_file(SparseFileWriter& outf, MMAPFile& inf,
 
 		// then, seek through the block
 		inf.seek((*i).length);
-		outf.write_sparse(pre_length);
+		outf.write_sparse((*i).length);
 	}
 
 	char* buf = new char[block_size];
