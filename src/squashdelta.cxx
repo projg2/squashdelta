@@ -254,7 +254,7 @@ std::list<struct compressed_block> get_blocks(MMAPFile& f, Compressor*& c,
 }
 
 void write_unpacked_file(SparseFileWriter& outf, MMAPFile& inf,
-		std::list<struct compressed_block> cb, Compressor& c,
+		std::list<struct compressed_block>& cb, Compressor& c,
 		size_t block_size)
 {
 	size_t prev_offset = 0;
@@ -298,7 +298,7 @@ void write_unpacked_file(SparseFileWriter& outf, MMAPFile& inf,
 }
 
 void write_block_list(SparseFileWriter& outf,
-		std::list<struct compressed_block> cb, bool at_end = true)
+		std::list<struct compressed_block>& cb, bool at_end = true)
 {
 	// now store the block count and magic
 	struct sqdelta_header h;
