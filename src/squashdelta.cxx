@@ -274,6 +274,10 @@ void write_unpacked_file(SparseFileWriter& outf, MMAPFile& inf,
 		outf.write_sparse((*i).length);
 	}
 
+	// write the last block
+	outf.write(inf.read_array<char>(inf.length - prev_offset),
+			inf.length - prev_offset);
+
 	char* buf = new char[block_size];
 	try
 	{
