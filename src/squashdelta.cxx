@@ -71,7 +71,8 @@ bool sort_by_len_hash(const struct compressed_block& lhs,
 }
 
 
-std::list<struct compressed_block> get_blocks(MMAPFile& f, Compressor*& c)
+std::list<struct compressed_block> get_blocks(MMAPFile& f, Compressor*& c,
+		size_t& block_size)
 {
 	const squashfs::super_block& sb = f.peek<squashfs::super_block>();
 
@@ -80,6 +81,11 @@ std::list<struct compressed_block> get_blocks(MMAPFile& f, Compressor*& c)
 				"File is not a valid SquashFS image (no magic).");
 	if (sb.s_major != 4 || sb.s_minor != 0)
 		throw std::runtime_error("File is not SquashFS 4.0");
+
+	if (!block_size)
+		block_size = sb.block_size;
+	else if (block_size != sb.block_size)
+		throw std::runtime_error("Input files have different block sizes");
 
 	switch (sb.compression)
 	{
@@ -248,7 +254,8 @@ std::list<struct compressed_block> get_blocks(MMAPFile& f, Compressor*& c)
 }
 
 void write_unpacked_file(SparseFileWriter& outf, MMAPFile& inf,
-		std::list<struct compressed_block> cb, Compressor& c)
+		std::list<struct compressed_block> cb, Compressor& c,
+		size_t block_size)
 {
 	size_t prev_offset = 0;
 	inf.seek(0, std::ios::beg);
@@ -267,18 +274,26 @@ void write_unpacked_file(SparseFileWriter& outf, MMAPFile& inf,
 		outf.write_sparse(pre_length);
 	}
 
-	for (std::list<struct compressed_block>::iterator i = cb.begin();
-			i != cb.end(); ++i)
+	char* buf = new char[block_size];
+	try
 	{
-		char buf[1000000];
-		size_t unc_length;
+		for (std::list<struct compressed_block>::iterator i = cb.begin();
+				i != cb.end(); ++i)
+		{
+			size_t unc_length;
 
-		inf.seek((*i).offset, std::ios::beg);
-		unc_length = c.decompress(buf, inf.read_array<char>((*i).length),
-				(*i).length, sizeof(buf));
+			inf.seek((*i).offset, std::ios::beg);
+			unc_length = c.decompress(buf, inf.read_array<char>((*i).length),
+					(*i).length, block_size);
 
-		(*i).uncompressed_length = unc_length;
-		outf.write(buf, unc_length);
+			(*i).uncompressed_length = unc_length;
+			outf.write(buf, unc_length);
+		}
+	}
+	catch (std::exception& e)
+	{
+		delete buf;
+		throw;
 	}
 }
 
@@ -331,12 +346,13 @@ int main(int argc, char* argv[])
 		std::list<struct compressed_block> target_blocks;
 
 		Compressor* c = 0;
+		size_t block_size = 0;
 
 		try
 		{
 			source_f.open(source_file);
 			std::cerr << "Source: " << source_file << "\n";
-			source_blocks = get_blocks(source_f, c);
+			source_blocks = get_blocks(source_f, c, block_size);
 		}
 		catch (IOError& e)
 		{
@@ -362,7 +378,7 @@ int main(int argc, char* argv[])
 		{
 			target_f.open(target_file);
 			std::cerr << "Target: " << target_file << "\n";
-			target_blocks = get_blocks(target_f, c);
+			target_blocks = get_blocks(target_f, c, block_size);
 		}
 		catch (IOError& e)
 		{
@@ -455,7 +471,8 @@ int main(int argc, char* argv[])
 			std::cerr << "Writing expanded source file..." << std::endl;
 
 			source_temp.open(source_f.length);
-			write_unpacked_file(source_temp, source_f, source_blocks, *c);
+			write_unpacked_file(source_temp, source_f, source_blocks, *c,
+					block_size);
 			write_block_list(source_temp, source_blocks);
 		}
 		catch (IOError& e)
@@ -479,7 +496,8 @@ int main(int argc, char* argv[])
 			std::cerr << "Writing expanded target file..." << std::endl;
 
 			target_temp.open(target_f.length);
-			write_unpacked_file(target_temp, target_f, target_blocks, *c);
+			write_unpacked_file(target_temp, target_f, target_blocks, *c,
+					block_size);
 			write_block_list(target_temp, target_blocks);
 		}
 		catch (IOError& e)
