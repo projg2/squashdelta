@@ -10,7 +10,9 @@
 
 #include <stdexcept>
 
-#include <lzo/lzo1x.h>
+#ifdef ENABLE_LZO
+#	include <lzo/lzo1x.h>
+#endif
 
 #include "compressor.hxx"
 
