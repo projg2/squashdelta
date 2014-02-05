@@ -144,7 +144,16 @@ public:
 
 	void write(const void* data, size_t length);
 	void write_sparse(size_t length);
+
+	template <class T>
+	void write(const T& data);
 };
+
+template <class T>
+void SparseFileWriter::write(const T& data)
+{
+	write(&data, sizeof(T));
+}
 
 static const char* tmpfile_template = "tmp.XXXXXX";
 

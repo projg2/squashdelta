@@ -22,6 +22,7 @@ extern "C"
 #	include <sys/types.h>
 #	include <sys/wait.h>
 #	include <unistd.h>
+#	include <arpa/inet.h>
 }
 
 #include "compressor.hxx"
@@ -36,6 +37,24 @@ struct compressed_block
 	size_t uncompressed_length;
 	uint32_t hash;
 };
+
+#pragma pack(push, 1)
+struct serialized_compressed_block
+{
+	uint32_t offset;
+	uint32_t length;
+	uint32_t uncompressed_length;
+};
+
+struct sqdelta_header
+{
+	uint32_t magic;
+	uint32_t flags;
+	uint32_t block_count;
+};
+#pragma pack(pop)
+
+const uint32_t sqdelta_magic = 0x5371ceb4;
 
 bool sort_by_offset(const struct compressed_block& lhs,
 		const struct compressed_block& rhs)
@@ -263,6 +282,30 @@ void write_unpacked_file(SparseFileWriter& outf, MMAPFile& inf,
 	}
 }
 
+void write_block_list(SparseFileWriter& outf,
+		std::list<struct compressed_block> cb)
+{
+	for (std::list<struct compressed_block>::iterator i = cb.begin();
+			i != cb.end(); ++i)
+	{
+		struct serialized_compressed_block b;
+
+		b.offset = htonl((*i).offset);
+		b.length = htonl((*i).length);
+		b.uncompressed_length = htonl((*i).uncompressed_length);
+
+		outf.write<struct serialized_compressed_block>(b);
+	}
+
+	// now store the block count and magic
+	struct sqdelta_header h;
+
+	h.block_count = htonl(cb.size());
+	h.flags = htonl(0);
+	h.magic = htonl(sqdelta_magic);
+	outf.write<struct sqdelta_header>(h);
+}
+
 int main(int argc, char* argv[])
 {
 	if (argc < 4)
@@ -408,6 +451,7 @@ int main(int argc, char* argv[])
 
 			source_temp.open(source_f.length);
 			write_unpacked_file(source_temp, source_f, source_blocks, *c);
+			write_block_list(source_temp, source_blocks);
 		}
 		catch (IOError& e)
 		{
@@ -431,6 +475,7 @@ int main(int argc, char* argv[])
 
 			target_temp.open(target_f.length);
 			write_unpacked_file(target_temp, target_f, target_blocks, *c);
+			write_block_list(target_temp, target_blocks);
 		}
 		catch (IOError& e)
 		{
@@ -448,9 +493,9 @@ int main(int argc, char* argv[])
 			return 1;
 		}
 
-		// TODO: write block list
-
 		delete c;
+
+		write_block_list(patch_out, source_blocks);
 
 		std::cerr << "Calling xdelta to generate the diff..." << std::endl;
 
