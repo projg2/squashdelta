@@ -283,8 +283,18 @@ void write_unpacked_file(SparseFileWriter& outf, MMAPFile& inf,
 }
 
 void write_block_list(SparseFileWriter& outf,
-		std::list<struct compressed_block> cb)
+		std::list<struct compressed_block> cb, bool at_end = true)
 {
+	// now store the block count and magic
+	struct sqdelta_header h;
+
+	h.block_count = htonl(cb.size());
+	h.flags = htonl(0);
+	h.magic = htonl(sqdelta_magic);
+
+	if (!at_end)
+		outf.write<struct sqdelta_header>(h);
+
 	for (std::list<struct compressed_block>::iterator i = cb.begin();
 			i != cb.end(); ++i)
 	{
@@ -297,13 +307,8 @@ void write_block_list(SparseFileWriter& outf,
 		outf.write<struct serialized_compressed_block>(b);
 	}
 
-	// now store the block count and magic
-	struct sqdelta_header h;
-
-	h.block_count = htonl(cb.size());
-	h.flags = htonl(0);
-	h.magic = htonl(sqdelta_magic);
-	outf.write<struct sqdelta_header>(h);
+	if (at_end)
+		outf.write<struct sqdelta_header>(h);
 }
 
 int main(int argc, char* argv[])
@@ -495,7 +500,7 @@ int main(int argc, char* argv[])
 
 		delete c;
 
-		write_block_list(patch_out, source_blocks);
+		write_block_list(patch_out, source_blocks, false);
 
 		std::cerr << "Calling xdelta to generate the diff..." << std::endl;
 
