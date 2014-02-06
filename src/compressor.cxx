@@ -16,11 +16,33 @@
 
 #include "compressor.hxx"
 
+namespace compressor_id
+{
+	enum compressor_id
+	{
+		lzo = 0x01 << 24,
+		mask = 0xff << 24
+	};
+}
+
 Compressor::~Compressor()
 {
 }
 
 #ifdef ENABLE_LZO
+
+namespace lzo_options
+{
+	enum lzo_options
+	{
+		lzo1x_999 = 0x00,
+		lzo1x_999_min = 0x01, // min compression level
+		lzo1x_999_max = 0x09, // max compression level
+		algo_level_mask = 0x0f,
+
+		optimized = 0x10
+	};
+}
 
 LZOCompressor::LZOCompressor()
 {
@@ -40,6 +62,18 @@ size_t LZOCompressor::decompress(void* dest, const void* src,
 		throw std::runtime_error("LZO decompression failed (corrupted data?)");
 
 	return out_bytes;
+}
+
+uint32_t LZOCompressor::get_compression_value() const
+{
+	// default algo: lzo1x_999
+	// default level: 8
+	// optimized since 4.3
+
+	return compressor_id::lzo
+		| lzo_options::lzo1x_999
+		| 8;
+//		| lzo_options::optimized;
 }
 
 #endif /*ENABLE_LZO*/

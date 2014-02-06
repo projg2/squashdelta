@@ -50,6 +50,7 @@ struct sqdelta_header
 {
 	uint32_t magic;
 	uint32_t flags;
+	uint32_t compression;
 	uint32_t block_count;
 };
 #pragma pack(pop)
@@ -304,15 +305,11 @@ void write_unpacked_file(SparseFileWriter& outf, MMAPFile& inf,
 	}
 }
 
-void write_block_list(SparseFileWriter& outf,
+void write_block_list(SparseFileWriter& outf, sqdelta_header h,
 		std::list<struct compressed_block>& cb, bool at_end = true)
 {
-	// now store the block count and magic
-	struct sqdelta_header h;
-
+	// store the block count in header
 	h.block_count = htonl(cb.size());
-	h.flags = htonl(0);
-	h.magic = htonl(sqdelta_magic);
 
 	if (!at_end)
 		outf.write<struct sqdelta_header>(h);
@@ -472,6 +469,11 @@ int main(int argc, char* argv[])
 			return 1;
 		}
 
+		struct sqdelta_header dh;
+		dh.flags = htonl(0);
+		dh.magic = htonl(sqdelta_magic);
+		dh.compression = htonl(c->get_compression_value());
+
 		TemporarySparseFileWriter source_temp, target_temp;
 		try
 		{
@@ -480,7 +482,7 @@ int main(int argc, char* argv[])
 			source_temp.open(source_f.length);
 			write_unpacked_file(source_temp, source_f, source_blocks, *c,
 					block_size);
-			write_block_list(source_temp, source_blocks);
+			write_block_list(source_temp, dh, source_blocks);
 		}
 		catch (IOError& e)
 		{
@@ -505,7 +507,7 @@ int main(int argc, char* argv[])
 			target_temp.open(target_f.length);
 			write_unpacked_file(target_temp, target_f, target_blocks, *c,
 					block_size);
-			write_block_list(target_temp, target_blocks);
+			write_block_list(target_temp, dh, target_blocks);
 		}
 		catch (IOError& e)
 		{
@@ -525,7 +527,7 @@ int main(int argc, char* argv[])
 
 		delete c;
 
-		write_block_list(patch_out, source_blocks, false);
+		write_block_list(patch_out, dh, source_blocks, false);
 
 		std::cerr << "Calling xdelta to generate the diff..." << std::endl;
 
