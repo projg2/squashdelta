@@ -87,6 +87,9 @@ std::list<struct compressed_block> get_blocks(MMAPFile& f, Compressor*& c,
 	else if (block_size != sb.block_size)
 		throw std::runtime_error("Input files have different block sizes");
 
+	if (sb.flags & squashfs::flags::compression_options)
+		throw std::runtime_error("Custom compression options are not supported currently");
+
 	switch (sb.compression)
 	{
 		case squashfs::compression::lzo:

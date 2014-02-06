@@ -44,6 +44,14 @@ namespace squashfs
 		};
 	}
 
+	namespace flags
+	{
+		enum flags
+		{
+			compression_options = 1 << 10
+		};
+	}
+
 	// bit fields
 	namespace inode_size
 	{
