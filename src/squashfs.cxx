@@ -316,7 +316,7 @@ static uint64_t get_fragment_table_offset(const MMAPFile& new_file,
 		const struct squashfs::super_block& sb)
 {
 	MMAPFile f = new_file;
-	f.seek(sb.fragment_table_start);
+	f.seek(sb.fragment_table_start, std::ios::beg);
 	return f.read<le64>();
 }
 
