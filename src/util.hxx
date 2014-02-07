@@ -155,11 +155,11 @@ void SparseFileWriter::write(const T& data)
 	write(&data, sizeof(T));
 }
 
-static const char* tmpfile_template = "tmp.XXXXXX";
+static const char tmpfile_template[] = "tmp.XXXXXX";
 
 class TemporarySparseFileWriter : public SparseFileWriter
 {
-	char buf[sizeof(tmpfile_template) + 1];
+	char buf[sizeof(tmpfile_template)];
 	pid_t parent_pid;
 
 public:
