@@ -21,6 +21,8 @@ extern "C"
 #endif
 }
 
+#include "util.hxx"
+
 class Compressor
 {
 public:
@@ -36,7 +38,7 @@ public:
 class LZOCompressor : public Compressor
 {
 public:
-	LZOCompressor();
+	LZOCompressor(const void* comp_options, size_t comp_opt_length);
 
 	virtual size_t decompress(void* dest, const void* src,
 			size_t length, size_t out_size) const;

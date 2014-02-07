@@ -75,7 +75,7 @@ bool sort_by_len_hash(const struct compressed_block& lhs,
 std::list<struct compressed_block> get_blocks(MMAPFile& f, Compressor*& c,
 		size_t& block_size)
 {
-	const squashfs::super_block& sb = f.peek<squashfs::super_block>();
+	const squashfs::super_block& sb = f.read<squashfs::super_block>();
 
 	if (sb.s_magic != squashfs::magic)
 		throw std::runtime_error(
@@ -88,15 +88,22 @@ std::list<struct compressed_block> get_blocks(MMAPFile& f, Compressor*& c,
 	else if (block_size != sb.block_size)
 		throw std::runtime_error("Input files have different block sizes");
 
+	uint16_t comp_opt_length = 0;
+	const void* comp_options = 0;
 	if (sb.flags & squashfs::flags::compression_options)
-		throw std::runtime_error("Custom compression options are not supported currently");
+	{
+		// do not use MetadataBlockReader since it needs the compressor
+		// it's easier to inline the necessary bits than to hack that around
+		comp_opt_length = f.read<le16>();
+		comp_options = f.read_array<char>(comp_opt_length);
+	}
 
 	switch (sb.compression)
 	{
 		case squashfs::compression::lzo:
 #ifdef ENABLE_LZO
 			if (!c)
-				c = new LZOCompressor();
+				c = new LZOCompressor(comp_options, comp_opt_length);
 			else if (typeid(*c) != typeid(LZOCompressor))
 				throw std::runtime_error("The two files use different compressors");
 #else

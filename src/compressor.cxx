@@ -44,8 +44,11 @@ namespace lzo_options
 	};
 }
 
-LZOCompressor::LZOCompressor()
+LZOCompressor::LZOCompressor(const void* comp_options,
+		size_t comp_opt_length)
 {
+	if (comp_options)
+		throw std::runtime_error("Custom compression options are not supported currently");
 	if (lzo_init() != LZO_E_OK)
 		throw std::runtime_error("lzo_init() failed");
 }
