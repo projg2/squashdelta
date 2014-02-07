@@ -37,6 +37,8 @@ public:
 #ifdef ENABLE_LZO
 class LZOCompressor : public Compressor
 {
+	int compression_level;
+
 public:
 	LZOCompressor(const void* comp_options, size_t comp_opt_length);
 

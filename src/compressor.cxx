@@ -44,11 +44,50 @@ namespace lzo_options
 	};
 }
 
+#pragma pack(push, 1)
+namespace lzo
+{
+	struct comp_options
+	{
+		le32 algorithm;
+		le32 compression_level;
+	};
+
+	namespace algorithm
+	{
+		enum algorithm
+		{
+			lzo1x_1 = 0,
+			lzo1x_1_11 = 1,
+			lzo1x_1_12 = 2,
+			lzo1x_1_15 = 3,
+			lzo1x_999 = 4
+		};
+	}
+}
+#pragma pack(pop)
+
 LZOCompressor::LZOCompressor(const void* comp_options,
 		size_t comp_opt_length)
+	: compression_level(8) // default
 {
 	if (comp_options)
-		throw std::runtime_error("Custom compression options are not supported currently");
+	{
+		const struct lzo::comp_options& opts
+			= *static_cast<const struct lzo::comp_options*>(comp_options);
+
+		if (comp_opt_length < sizeof(opts))
+			throw std::runtime_error("Compression options too short");
+
+		if (opts.algorithm != lzo::algorithm::lzo1x_999)
+			throw std::runtime_error("Only lzo1x_999 algorithm is supported");
+
+		if (opts.compression_level < 1 || opts.compression_level > 9)
+			throw std::runtime_error("Invalid compression level specified");
+
+		compression_level = opts.compression_level;
+	}
+
 	if (lzo_init() != LZO_E_OK)
 		throw std::runtime_error("lzo_init() failed");
 }
@@ -75,7 +114,7 @@ uint32_t LZOCompressor::get_compression_value() const
 
 	return compressor_id::lzo
 		| lzo_options::lzo1x_999
-		| 8;
+		| compression_level;
 //		| lzo_options::optimized;
 }
 
