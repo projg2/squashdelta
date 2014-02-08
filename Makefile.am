@@ -8,9 +8,11 @@ squashdelta_SOURCES = \
 	src/util.cxx
 
 squashdelta_CPPFLAGS = \
-	$(LZO_CFLAGS)
+	$(LZO_CFLAGS) \
+	$(LZ4_CFLAGS)
 squashdelta_LDADD = \
-	$(LZO_LIBS)
+	$(LZO_LIBS) \
+	$(LZ4_LIBS)
 
 EXTRA_DIST = NEWS
 NEWS: configure.ac Makefile.am

@@ -39,6 +39,18 @@ AS_IF([test "x$enable_lzo" != "xno"], [
 	])
 ])
 
+AC_ARG_ENABLE([lz4],
+	AS_HELP_STRING([--disable-lz4], [Disable lz4 support (default: autodetect)]))
+AS_IF([test "x$enable_lz4" != "xno"], [
+	AC_CHECK_HEADER([lz4.h], [
+		AC_CHECK_LIB([lz4], [LZ4_decompress_safe], [
+			AC_DEFINE([ENABLE_LZ4], [1], [Define to enable LZ4 support])
+			AC_SUBST([LZ4_CFLAGS], [])
+			AC_SUBST([LZ4_LIBS], [-llz4])
+		])
+	])
+])
+
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_FILES([Makefile])
 AC_OUTPUT

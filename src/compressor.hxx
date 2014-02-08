@@ -49,4 +49,19 @@ public:
 };
 #endif /*ENABLE_LZO*/
 
+#ifdef ENABLE_LZ4
+class LZ4Compressor : public Compressor
+{
+	bool hc;
+
+public:
+	LZ4Compressor(const void* comp_options, size_t comp_opt_length);
+
+	virtual size_t decompress(void* dest, const void* src,
+			size_t length, size_t out_size) const;
+
+	virtual uint32_t get_compression_value() const;
+};
+#endif /*ENABLE_LZ4*/
+
 #endif /*!SDT_COMPRESSOR_HXX*/

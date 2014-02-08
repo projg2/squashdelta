@@ -110,6 +110,16 @@ std::list<struct compressed_block> get_blocks(MMAPFile& f, Compressor*& c,
 			throw std::runtime_error("LZO compression support disabled at build time");
 #endif
 			break;
+		case squashfs::compression::lz4:
+#ifdef ENABLE_LZ4
+			if (!c)
+				c = new LZ4Compressor(comp_options, comp_opt_length);
+			else if (typeid(*c) != typeid(LZ4Compressor))
+				throw std::runtime_error("The two files use different compressors");
+#else
+			throw std::runtime_error("LZ4 compression support disabled at build time");
+#endif
+			break;
 		default:
 			throw std::runtime_error("Unsupported compression algorithm.");
 	}

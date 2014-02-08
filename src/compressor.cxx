@@ -13,6 +13,10 @@
 #ifdef ENABLE_LZO
 #	include <lzo/lzo1x.h>
 #endif
+#ifdef ENABLE_LZ4
+#	include <lz4.h>
+#	include <lz4hc.h>
+#endif
 
 #include "compressor.hxx"
 
@@ -21,6 +25,7 @@ namespace compressor_id
 	enum compressor_id
 	{
 		lzo = 0x01 << 24,
+		lz4 = 0x02 << 24,
 		mask = 0xff << 24
 	};
 }
@@ -119,3 +124,92 @@ uint32_t LZOCompressor::get_compression_value() const
 }
 
 #endif /*ENABLE_LZO*/
+
+#ifdef ENABLE_LZ4
+
+namespace lz4_options
+{
+	enum lz4_options
+	{
+		hc = 1
+	};
+}
+
+#pragma pack(push, 1)
+namespace lz4
+{
+	struct comp_options
+	{
+		le32 version;
+		le32 flags;
+	};
+
+	namespace version
+	{
+		enum version
+		{
+			legacy = 1
+		};
+	}
+
+	namespace flags
+	{
+		enum flags
+		{
+			hc = 1,
+
+			flags_mask = hc
+		};
+	}
+}
+#pragma pack(pop)
+
+LZ4Compressor::LZ4Compressor(const void* comp_options,
+		size_t comp_opt_length)
+{
+	if (comp_options)
+	{
+		const struct lz4::comp_options& opts
+			= *static_cast<const struct lz4::comp_options*>(comp_options);
+
+		if (comp_opt_length < sizeof(opts))
+			throw std::runtime_error("Compression options too short");
+
+		if (opts.version != lz4::version::legacy)
+			throw std::runtime_error("Unsupported LZ4 stream version");
+
+		if ((opts.flags & ~lz4::flags::flags_mask) != 0)
+			throw std::runtime_error("Unknown LZ4 flags found");
+
+		hc = opts.flags & lz4::flags::hc;
+	}
+	else
+		throw std::runtime_error("No compression options for LZ4 found");
+}
+
+size_t LZ4Compressor::decompress(void* dest, const void* src,
+		size_t length, size_t out_size) const
+{
+	const char* src2 = static_cast<const char*>(src);
+	char* dest2 = static_cast<char*>(dest);
+	int out;
+
+	out = LZ4_decompress_safe(src2, dest2, length, out_size);
+
+	if (out < 0)
+		throw std::runtime_error("LZ4 decompression failed (corrupted data?)");
+
+	return out;
+}
+
+uint32_t LZ4Compressor::get_compression_value() const
+{
+	uint32_t ret = compressor_id::lz4;
+
+	if (hc)
+		ret |= lz4_options::hc;
+
+	return ret;
+}
+
+#endif /*ENABLE_LZ4*/
