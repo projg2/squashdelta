@@ -248,11 +248,11 @@ namespace squashfs
 class MetadataBlockReader
 {
 	MMAPFile f;
-	const Compressor& compressor;
+	Compressor& compressor;
 
 public:
 	MetadataBlockReader(const MMAPFile& new_file,
-			size_t offset, const Compressor& c);
+			size_t offset, Compressor& c);
 
 	size_t read(void* dest, size_t dest_size);
 
@@ -273,7 +273,7 @@ public:
 	size_t block_num;
 
 	MetadataReader(const MMAPFile& new_file,
-			size_t offset, const Compressor& c);
+			size_t offset, Compressor& c);
 
 	void* peek(size_t length);
 	void seek(size_t length);
@@ -291,7 +291,7 @@ class InodeReader
 public:
 	InodeReader(const MMAPFile& new_file,
 		const struct squashfs::super_block& sb,
-		const Compressor& c);
+		Compressor& c);
 
 	union squashfs::inode::inode& read();
 
@@ -310,7 +310,7 @@ public:
 
 	FragmentTableReader(const MMAPFile& new_file,
 			const struct squashfs::super_block& sb,
-			const Compressor& c);
+			Compressor& c);
 
 	struct squashfs::fragment_entry& read();
 

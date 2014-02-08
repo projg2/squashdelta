@@ -28,8 +28,10 @@ class Compressor
 public:
 	virtual ~Compressor();
 
+	virtual void reset();
+
 	virtual size_t decompress(void* dest, const void* src,
-			size_t length, size_t out_size) const = 0;
+			size_t length, size_t out_size) = 0;
 
 	virtual uint32_t get_compression_value() const = 0;
 };
@@ -38,12 +40,16 @@ public:
 class LZOCompressor : public Compressor
 {
 	int compression_level;
+	bool optimized;
+	bool optimized_tested;
 
 public:
 	LZOCompressor(const void* comp_options, size_t comp_opt_length);
 
+	virtual void reset();
+
 	virtual size_t decompress(void* dest, const void* src,
-			size_t length, size_t out_size) const;
+			size_t length, size_t out_size);
 
 	virtual uint32_t get_compression_value() const;
 };
@@ -58,7 +64,7 @@ public:
 	LZ4Compressor(const void* comp_options, size_t comp_opt_length);
 
 	virtual size_t decompress(void* dest, const void* src,
-			size_t length, size_t out_size) const;
+			size_t length, size_t out_size);
 
 	virtual uint32_t get_compression_value() const;
 };

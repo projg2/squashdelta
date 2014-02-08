@@ -496,6 +496,7 @@ int main(int argc, char* argv[])
 		{
 			std::cerr << "Writing expanded source file..." << std::endl;
 
+			c->reset();
 			source_temp.open(source_f.length);
 			write_unpacked_file(source_temp, source_f, source_blocks, *c,
 					block_size);
@@ -521,6 +522,7 @@ int main(int argc, char* argv[])
 		{
 			std::cerr << "Writing expanded target file..." << std::endl;
 
+			c->reset();
 			target_temp.open(target_f.length);
 			write_unpacked_file(target_temp, target_f, target_blocks, *c,
 					block_size);

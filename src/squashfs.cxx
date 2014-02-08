@@ -92,7 +92,7 @@ size_t squashfs::inode::lreg::inode_size(uint32_t block_size, uint16_t block_log
 }
 
 MetadataBlockReader::MetadataBlockReader(const MMAPFile& new_file,
-		size_t offset, const Compressor& c)
+		size_t offset, Compressor& c)
 	: f(new_file), compressor(c)
 {
 	f.seek(offset, std::ios::beg);
@@ -133,7 +133,7 @@ void MetadataBlockReader::read_input_block(const void*& data,
 }
 
 MetadataReader::MetadataReader(const MMAPFile& new_file,
-		size_t offset, const Compressor& c)
+		size_t offset, Compressor& c)
 	: f(new_file, offset, c),
 	bufp(buf), buf_filled(0), block_num(0)
 {
@@ -176,7 +176,7 @@ void MetadataReader::seek(size_t length)
 
 InodeReader::InodeReader(const MMAPFile& new_file,
 		const struct squashfs::super_block& sb,
-		const Compressor& c)
+		Compressor& c)
 	: f(new_file, sb.inode_table_start, c),
 	inode_num(0), no_inodes(sb.inodes),
 	block_size(sb.block_size), block_log(sb.block_log)
@@ -322,7 +322,7 @@ static uint64_t get_fragment_table_offset(const MMAPFile& new_file,
 
 FragmentTableReader::FragmentTableReader(const MMAPFile& new_file,
 		const struct squashfs::super_block& sb,
-		const Compressor& c)
+		Compressor& c)
 	: f(new_file, get_fragment_table_offset(new_file, sb), c),
 	entry_num(0), no_entries(sb.fragments),
 	start_offset(get_fragment_table_offset(new_file, sb))
