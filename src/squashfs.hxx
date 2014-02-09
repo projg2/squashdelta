@@ -274,11 +274,23 @@ public:
 	MetadataReader(const MMAPFile& new_file,
 			size_t offset, Compressor& c);
 
+	template <class T>
+	const T& read();
+
 	void* peek(size_t length);
 	void seek(size_t length);
 
 	size_t block_num();
 };
+
+template <class T>
+const T& MetadataReader::read()
+{
+	const T* ret = static_cast<const T*>(peek(sizeof(T)));
+	seek(sizeof(T));
+
+	return *ret;
+}
 
 class InodeReader
 {
@@ -313,7 +325,7 @@ public:
 			const struct squashfs::super_block& sb,
 			Compressor& c);
 
-	struct squashfs::fragment_entry& read();
+	const struct squashfs::fragment_entry& read();
 
 	size_t block_num();
 };

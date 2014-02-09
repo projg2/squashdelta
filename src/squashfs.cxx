@@ -337,20 +337,17 @@ FragmentTableReader::FragmentTableReader(const MMAPFile& new_file,
 {
 }
 
-struct squashfs::fragment_entry& FragmentTableReader::read()
+const struct squashfs::fragment_entry& FragmentTableReader::read()
 {
 	if (entry_num >= no_entries+1)
 		throw std::runtime_error("Trying to read past last fragment");
 
-	struct squashfs::fragment_entry* ret;
+	const struct squashfs::fragment_entry& ret
+		= f.read<squashfs::fragment_entry>();
 
-	ret = static_cast<struct squashfs::fragment_entry*>(
-			f.peek(sizeof(*ret)));
-
-	f.seek(sizeof(*ret));
 	++entry_num;
 
-	return *ret;
+	return ret;
 }
 
 size_t FragmentTableReader::block_num()

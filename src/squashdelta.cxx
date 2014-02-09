@@ -206,7 +206,7 @@ std::list<struct compressed_block> get_blocks(MMAPFile& f, Compressor*& c,
 
 	for (uint32_t i = 0; i < sb.fragments; ++i)
 	{
-		struct squashfs::fragment_entry& fe = fr.read();
+		const struct squashfs::fragment_entry& fe = fr.read();
 
 		if (!(fe.size & squashfs::block_size::uncompressed))
 		{
