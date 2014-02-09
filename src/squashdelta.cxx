@@ -103,7 +103,7 @@ std::list<struct compressed_block> get_blocks(MMAPFile& f, Compressor*& c,
 		case squashfs::compression::lzo:
 #ifdef ENABLE_LZO
 			if (!c)
-				c = new LZOCompressor(comp_options, comp_opt_length);
+				c = new LZOCompressor();
 			else if (typeid(*c) != typeid(LZOCompressor))
 				throw std::runtime_error("The two files use different compressors");
 #else
@@ -113,7 +113,7 @@ std::list<struct compressed_block> get_blocks(MMAPFile& f, Compressor*& c,
 		case squashfs::compression::lz4:
 #ifdef ENABLE_LZ4
 			if (!c)
-				c = new LZ4Compressor(comp_options, comp_opt_length);
+				c = new LZ4Compressor();
 			else if (typeid(*c) != typeid(LZ4Compressor))
 				throw std::runtime_error("The two files use different compressors");
 #else
@@ -123,6 +123,8 @@ std::list<struct compressed_block> get_blocks(MMAPFile& f, Compressor*& c,
 		default:
 			throw std::runtime_error("Unsupported compression algorithm.");
 	}
+
+	c->setup(comp_options, comp_opt_length);
 
 	std::list<struct compressed_block>
 		compressed_metadata_blocks,

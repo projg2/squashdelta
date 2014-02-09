@@ -28,6 +28,7 @@ class Compressor
 public:
 	virtual ~Compressor();
 
+	virtual void setup(const void* comp_options, size_t comp_opt_length) = 0;
 	virtual void reset();
 
 	virtual size_t decompress(void* dest, const void* src,
@@ -44,8 +45,9 @@ class LZOCompressor : public Compressor
 	bool optimized_tested;
 
 public:
-	LZOCompressor(const void* comp_options, size_t comp_opt_length);
+	LZOCompressor();
 
+	virtual void setup(const void* comp_options, size_t comp_opt_length);
 	virtual void reset();
 
 	virtual size_t decompress(void* dest, const void* src,
@@ -61,7 +63,9 @@ class LZ4Compressor : public Compressor
 	bool hc;
 
 public:
-	LZ4Compressor(const void* comp_options, size_t comp_opt_length);
+	LZ4Compressor();
+
+	virtual void setup(const void* comp_options, size_t comp_opt_length);
 
 	virtual size_t decompress(void* dest, const void* src,
 			size_t length, size_t out_size);

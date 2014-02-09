@@ -77,10 +77,15 @@ namespace lzo
 }
 #pragma pack(pop)
 
-LZOCompressor::LZOCompressor(const void* comp_options,
-		size_t comp_opt_length)
+LZOCompressor::LZOCompressor()
 	: compression_level(8), optimized(true), // default
 	optimized_tested(false)
+{
+	if (lzo_init() != LZO_E_OK)
+		throw std::runtime_error("lzo_init() failed");
+}
+
+void LZOCompressor::setup(const void* comp_options, size_t comp_opt_length)
 {
 	if (comp_options)
 	{
@@ -98,9 +103,6 @@ LZOCompressor::LZOCompressor(const void* comp_options,
 
 		compression_level = opts.compression_level;
 	}
-
-	if (lzo_init() != LZO_E_OK)
-		throw std::runtime_error("lzo_init() failed");
 }
 
 void LZOCompressor::reset()
@@ -236,8 +238,11 @@ namespace lz4
 }
 #pragma pack(pop)
 
-LZ4Compressor::LZ4Compressor(const void* comp_options,
-		size_t comp_opt_length)
+LZ4Compressor::LZ4Compressor()
+{
+}
+
+void LZ4Compressor::setup(const void* comp_options, size_t comp_opt_length)
 {
 	if (comp_options)
 	{
