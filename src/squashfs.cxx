@@ -135,7 +135,7 @@ void MetadataBlockReader::read_input_block(const void*& data,
 MetadataReader::MetadataReader(const MMAPFile& new_file,
 		size_t offset, Compressor& c)
 	: f(new_file, offset, c),
-	bufp(buf), buf_filled(0), block_num(0)
+	bufp(buf), buf_filled(0), _block_num(0)
 {
 }
 
@@ -157,7 +157,7 @@ void MetadataReader::poll_data()
 	// output and we can guarantee that we have at least that much free
 	buf_filled += f.read(writep, squashfs::metadata_size);
 
-	++block_num;
+	++_block_num;
 }
 
 void* MetadataReader::peek(size_t length)
@@ -172,6 +172,14 @@ void MetadataReader::seek(size_t length)
 {
 	bufp += length;
 	buf_filled -= length;
+}
+
+size_t MetadataReader::block_num()
+{
+	if (buf_filled > 0)
+		throw std::runtime_error("Expected metadata ended mid-block. File likely corrupted.");
+
+	return _block_num;
 }
 
 InodeReader::InodeReader(const MMAPFile& new_file,
@@ -309,7 +317,7 @@ union squashfs::inode::inode& InodeReader::read()
 
 size_t InodeReader::block_num()
 {
-	return f.block_num;
+	return f.block_num();
 }
 
 static uint64_t get_fragment_table_offset(const MMAPFile& new_file,
@@ -347,5 +355,5 @@ struct squashfs::fragment_entry& FragmentTableReader::read()
 
 size_t FragmentTableReader::block_num()
 {
-	return f.block_num;
+	return f.block_num();
 }

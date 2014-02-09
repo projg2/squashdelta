@@ -266,17 +266,18 @@ class MetadataReader
 	char buf[2 * squashfs::metadata_size];
 	char* bufp;
 	size_t buf_filled;
+	size_t _block_num;
 
 	void poll_data();
 
 public:
-	size_t block_num;
-
 	MetadataReader(const MMAPFile& new_file,
 			size_t offset, Compressor& c);
 
 	void* peek(size_t length);
 	void seek(size_t length);
+
+	size_t block_num();
 };
 
 class InodeReader
