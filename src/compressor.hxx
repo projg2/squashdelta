@@ -21,6 +21,7 @@ extern "C"
 #endif
 }
 
+#include "squashfs.hxx"
 #include "util.hxx"
 
 class Compressor
@@ -28,7 +29,7 @@ class Compressor
 public:
 	virtual ~Compressor();
 
-	virtual void setup(const void* comp_options, size_t comp_opt_length) = 0;
+	virtual void setup(MetadataReader* coptsr) = 0;
 	virtual void reset();
 
 	virtual size_t decompress(void* dest, const void* src,
@@ -47,7 +48,7 @@ class LZOCompressor : public Compressor
 public:
 	LZOCompressor();
 
-	virtual void setup(const void* comp_options, size_t comp_opt_length);
+	virtual void setup(MetadataReader* coptsr);
 	virtual void reset();
 
 	virtual size_t decompress(void* dest, const void* src,
@@ -65,7 +66,7 @@ class LZ4Compressor : public Compressor
 public:
 	LZ4Compressor();
 
-	virtual void setup(const void* comp_options, size_t comp_opt_length);
+	virtual void setup(MetadataReader* coptsr);
 
 	virtual size_t decompress(void* dest, const void* src,
 			size_t length, size_t out_size);

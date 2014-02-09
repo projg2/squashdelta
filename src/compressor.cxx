@@ -85,15 +85,12 @@ LZOCompressor::LZOCompressor()
 		throw std::runtime_error("lzo_init() failed");
 }
 
-void LZOCompressor::setup(const void* comp_options, size_t comp_opt_length)
+void LZOCompressor::setup(MetadataReader* coptsr)
 {
-	if (comp_options)
+	if (coptsr)
 	{
 		const struct lzo::comp_options& opts
-			= *static_cast<const struct lzo::comp_options*>(comp_options);
-
-		if (comp_opt_length < sizeof(opts))
-			throw std::runtime_error("Compression options too short");
+			= coptsr->read<struct lzo::comp_options>();
 
 		if (opts.algorithm != lzo::algorithm::lzo1x_999)
 			throw std::runtime_error("Only lzo1x_999 algorithm is supported");
@@ -242,15 +239,12 @@ LZ4Compressor::LZ4Compressor()
 {
 }
 
-void LZ4Compressor::setup(const void* comp_options, size_t comp_opt_length)
+void LZ4Compressor::setup(MetadataReader* coptsr)
 {
-	if (comp_options)
+	if (coptsr)
 	{
 		const struct lz4::comp_options& opts
-			= *static_cast<const struct lz4::comp_options*>(comp_options);
-
-		if (comp_opt_length < sizeof(opts))
-			throw std::runtime_error("Compression options too short");
+			= coptsr->read<struct lz4::comp_options>();
 
 		if (opts.version != lz4::version::legacy)
 			throw std::runtime_error("Unsupported LZ4 stream version");

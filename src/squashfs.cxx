@@ -17,6 +17,7 @@ extern "C"
 #endif
 }
 
+#include "compressor.hxx"
 #include "squashfs.hxx"
 
 unsigned char* squashfs::dir_index::name()

@@ -88,16 +88,6 @@ std::list<struct compressed_block> get_blocks(MMAPFile& f, Compressor*& c,
 	else if (block_size != sb.block_size)
 		throw std::runtime_error("Input files have different block sizes");
 
-	uint16_t comp_opt_length = 0;
-	const void* comp_options = 0;
-	if (sb.flags & squashfs::flags::compression_options)
-	{
-		// do not use MetadataBlockReader since it needs the compressor
-		// it's easier to inline the necessary bits than to hack that around
-		comp_opt_length = f.read<le16>();
-		comp_options = f.read_array<char>(comp_opt_length);
-	}
-
 	switch (sb.compression)
 	{
 		case squashfs::compression::lzo:
@@ -124,7 +114,10 @@ std::list<struct compressed_block> get_blocks(MMAPFile& f, Compressor*& c,
 			throw std::runtime_error("Unsupported compression algorithm.");
 	}
 
-	c->setup(comp_options, comp_opt_length);
+	MetadataReader coptsr(f, sizeof(sb), *c);
+	c->setup(sb.flags & squashfs::flags::compression_options
+			? &coptsr : 0);
+	coptsr.block_num();
 
 	std::list<struct compressed_block>
 		compressed_metadata_blocks,

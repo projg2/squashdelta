@@ -26,8 +26,9 @@ extern "C"
 #endif
 }
 
-#include "compressor.hxx"
 #include "util.hxx"
+
+class Compressor;
 
 namespace squashfs
 {
