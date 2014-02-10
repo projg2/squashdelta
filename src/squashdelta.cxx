@@ -131,14 +131,27 @@ std::list<struct compressed_block> get_blocks(MMAPFile& f, Compressor*& c,
 	{
 		union squashfs::inode::inode& in = ir.read();
 
-		if (in.as_base.inode_type == squashfs::inode::type::reg)
+		if (in.as_base.inode_type == squashfs::inode::type::reg
+				|| in.as_base.inode_type == squashfs::inode::type::lreg)
 		{
-			uint32_t pos = in.as_reg.start_block;
-			le32* block_list = in.as_reg.block_list();
+			uint32_t pos;
+			uint32_t block_count;
+			le32* block_list;
 
-			for (uint32_t j = 0;
-					j < in.as_reg.block_count(sb.block_size, sb.block_log);
-					++j)
+			if (in.as_base.inode_type == squashfs::inode::type::reg)
+			{
+				pos = in.as_reg.start_block;
+				block_count = in.as_reg.block_count(sb.block_size, sb.block_log);
+				block_list = in.as_reg.block_list();
+			}
+			else
+			{
+				pos = in.as_lreg.start_block;
+				block_count = in.as_lreg.block_count(sb.block_size, sb.block_log);
+				block_list = in.as_lreg.block_list();
+			}
+
+			for (uint32_t j = 0; j < block_count; ++j)
 			{
 				if (block_list[j] & squashfs::block_size::uncompressed)
 				{

@@ -78,9 +78,10 @@ struct squashfs::dir_index* squashfs::inode::ldir::index()
 	return static_cast<struct dir_index*>(voidp);
 }
 
-size_t squashfs::inode::lreg::inode_size(uint32_t block_size, uint16_t block_log)
+uint32_t squashfs::inode::lreg::block_count(uint32_t block_size,
+		uint16_t block_log)
 {
-	uint64_t blocks = file_size;
+	uint32_t blocks = file_size;
 
 	// if fragments were not used, round up the last block
 	if (fragment == squashfs::invalid_frag)
@@ -89,7 +90,15 @@ size_t squashfs::inode::lreg::inode_size(uint32_t block_size, uint16_t block_log
 	// bytes -> blocks
 	blocks >>= block_log;
 
-	return sizeof(*this) + 2 * blocks * sizeof(le16);
+	return blocks;
+}
+
+size_t squashfs::inode::lreg::inode_size(uint32_t block_size,
+		uint16_t block_log)
+{
+	uint32_t blocks = block_count(block_size, block_log);
+
+	return sizeof(*this) + blocks * sizeof(le32);
 }
 
 MetadataBlockReader::MetadataBlockReader(const MMAPFile& new_file,
