@@ -333,6 +333,12 @@ size_t InodeReader::block_num()
 static uint64_t get_fragment_table_offset(const MMAPFile& new_file,
 		const struct squashfs::super_block& sb)
 {
+	// if the fragment table is empty, there's no index to read.
+	// instead, use a value that would trigger a nice EOF when someone
+	// tries to read it
+	if (sb.fragments == 0)
+		return new_file.length;
+
 	MMAPFile f = new_file;
 	f.seek(sb.fragment_table_start, std::ios::beg);
 	return f.read<le64>();
