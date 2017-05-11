@@ -137,7 +137,7 @@ SparseFileWriter::SparseFileWriter()
 {
 }
 
-SparseFileWriter::~SparseFileWriter()
+SparseFileWriter::~SparseFileWriter() THROWING
 {
 	if (fd != -1)
 	{
@@ -188,7 +188,7 @@ TemporarySparseFileWriter::TemporarySparseFileWriter()
 {
 }
 
-TemporarySparseFileWriter::~TemporarySparseFileWriter()
+TemporarySparseFileWriter::~TemporarySparseFileWriter() THROWING
 {
 	// unlink the file only in parent process
 	if (parent_pid == getpid() && unlink(name()) == -1)
