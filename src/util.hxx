@@ -27,13 +27,6 @@ extern "C"
 #endif
 }
 
-// Define macro for post-C++11 destructors' noexcept specification
-#if __cplusplus >= 201103L
-#define THROWING noexcept(false)
-#else
-#define THROWING
-#endif
-
 /**
  * Utility classes.
  */
@@ -145,7 +138,7 @@ public:
 	int fd;
 
 	SparseFileWriter();
-	virtual ~SparseFileWriter() THROWING;
+	virtual ~SparseFileWriter();
 
 	void open(const char* path, off_t expected_size = 0);
 	void close();
@@ -172,7 +165,7 @@ class TemporarySparseFileWriter : public SparseFileWriter
 
 public:
 	TemporarySparseFileWriter();
-	virtual ~TemporarySparseFileWriter() THROWING;
+	virtual ~TemporarySparseFileWriter();
 
 	void open(off_t expected_size = 0);
 	void close();

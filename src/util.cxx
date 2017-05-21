@@ -137,13 +137,10 @@ SparseFileWriter::SparseFileWriter()
 {
 }
 
-SparseFileWriter::~SparseFileWriter() THROWING
+SparseFileWriter::~SparseFileWriter()
 {
 	if (fd != -1)
-	{
-		if (::close(fd) == -1)
-			throw IOError("close() failed", errno);
-	}
+		::close(fd);
 }
 
 void SparseFileWriter::open(const char* path, off_t expected_size)
@@ -198,14 +195,14 @@ TemporarySparseFileWriter::TemporarySparseFileWriter()
 {
 }
 
-TemporarySparseFileWriter::~TemporarySparseFileWriter() THROWING
+TemporarySparseFileWriter::~TemporarySparseFileWriter()
 {
 	if (buf[0] == '\0')
 		return;
 
 	// unlink the file only in parent process
-	if (parent_pid == getpid() && unlink(name()) == -1)
-		throw IOError("Unable to unlink the temporary file", errno);
+	if (parent_pid == getpid())
+		unlink(name());
 }
 
 void TemporarySparseFileWriter::open(off_t expected_size)
