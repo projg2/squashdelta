@@ -148,6 +148,7 @@ public:
 	virtual ~SparseFileWriter() THROWING;
 
 	void open(const char* path, off_t expected_size = 0);
+	void close();
 
 	void write(const void* data, size_t length);
 	void write_sparse(size_t length);
@@ -174,6 +175,7 @@ public:
 	virtual ~TemporarySparseFileWriter() THROWING;
 
 	void open(off_t expected_size = 0);
+	void close();
 
 	const char* name();
 };

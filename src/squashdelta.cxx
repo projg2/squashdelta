@@ -597,6 +597,10 @@ int main(int argc, char* argv[])
 				return 1;
 			}
 		}
+
+		target_temp.close();
+		source_temp.close();
+		patch_out.close();
 	}
 	catch (IOError& e)
 	{

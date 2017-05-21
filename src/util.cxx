@@ -156,6 +156,16 @@ void SparseFileWriter::open(const char* path, off_t expected_size)
 		posix_fallocate(fd, 0, expected_size);
 }
 
+void SparseFileWriter::close()
+{
+	if (fd == -1)
+		throw std::runtime_error("File is already closed!");
+
+	if (::close(fd) == -1)
+		throw IOError("close() failed", errno);
+	fd = -1;
+}
+
 void SparseFileWriter::write(const void* data, size_t length)
 {
 	const char* buf = static_cast<const char*>(data);
@@ -190,6 +200,9 @@ TemporarySparseFileWriter::TemporarySparseFileWriter()
 
 TemporarySparseFileWriter::~TemporarySparseFileWriter() THROWING
 {
+	if (buf[0] == '\0')
+		return;
+
 	// unlink the file only in parent process
 	if (parent_pid == getpid() && unlink(name()) == -1)
 		throw IOError("Unable to unlink the temporary file", errno);
@@ -211,4 +224,14 @@ void TemporarySparseFileWriter::open(off_t expected_size)
 const char* TemporarySparseFileWriter::name()
 {
 	return buf;
+}
+
+void TemporarySparseFileWriter::close()
+{
+	SparseFileWriter::close();
+
+	// unlink the file only in parent process
+	if (parent_pid == getpid() && unlink(name()) == -1)
+		throw IOError("Unable to unlink the temporary file", errno);
+	buf[0] = '\0';
 }
