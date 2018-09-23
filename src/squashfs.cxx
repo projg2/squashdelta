@@ -114,7 +114,7 @@ size_t MetadataBlockReader::read(void* dest, size_t dest_size)
 	size_t length;
 	const void* data;
 
-	read_input_block(data, length, compressed);
+	read_input_block(&data, &length, &compressed);
 
 	if (!compressed)
 	{
@@ -132,14 +132,14 @@ size_t MetadataBlockReader::read(void* dest, size_t dest_size)
 	}
 }
 
-void MetadataBlockReader::read_input_block(const void*& data,
-		size_t& length, bool& compressed)
+void MetadataBlockReader::read_input_block(const void** data,
+		size_t* length, bool* compressed)
 {
 	uint16_t block_size = f.read<le16>();
 
-	length = block_size & ~squashfs::inode_size::uncompressed;
-	compressed = !(block_size & squashfs::inode_size::uncompressed);
-	data = f.read_array<char>(length);
+	*length = block_size & ~squashfs::inode_size::uncompressed;
+	*compressed = !(block_size & squashfs::inode_size::uncompressed);
+	*data = f.read_array<char>(*length);
 }
 
 MetadataReader::MetadataReader(const MMAPFile& new_file,

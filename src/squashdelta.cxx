@@ -190,7 +190,7 @@ std::list<struct compressed_block> get_blocks(MMAPFile& f, Compressor*& c,
 		size_t length;
 		bool compressed;
 
-		mir.read_input_block(data, length, compressed);
+		mir.read_input_block(&data, &length, &compressed);
 
 		if (compressed)
 		{
@@ -240,7 +240,7 @@ std::list<struct compressed_block> get_blocks(MMAPFile& f, Compressor*& c,
 		size_t length;
 		bool compressed;
 
-		mir.read_input_block(data, length, compressed);
+		mir.read_input_block(&data, &length, &compressed);
 
 		if (compressed)
 		{

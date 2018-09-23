@@ -258,7 +258,7 @@ public:
 
 	size_t read(void* dest, size_t dest_size);
 
-	void read_input_block(const void*& data, size_t& length, bool& compressed);
+	void read_input_block(const void** data, size_t* length, bool* compressed);
 };
 
 class MetadataReader
