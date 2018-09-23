@@ -103,6 +103,14 @@ void MMAPFile::close()
 		throw IOError("Unable to close file", errno);
 }
 
+size_t MMAPFile::getpos() const
+{
+	if (!data)
+		throw std::logic_error("getpos() for closed file");
+
+	return (pos - static_cast<char*>(data));
+}
+
 void MMAPFile::seek(ssize_t offset, std::ios_base::seekdir whence)
 {
 	char* newpos;

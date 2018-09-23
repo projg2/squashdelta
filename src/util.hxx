@@ -71,6 +71,8 @@ public:
 class MMAPFile
 {
 	int fd;
+	void* data;
+
 	char* pos;
 	char* end;
 
@@ -78,7 +80,6 @@ class MMAPFile
 
 public:
 	size_t length;
-	void* data;
 
 	MMAPFile();
 	MMAPFile(const MMAPFile& ref);
@@ -96,6 +97,7 @@ public:
 	template <class T>
 	const T* read_array(size_t n);
 
+	size_t getpos() const;
 	void seek(ssize_t offset,
 			std::ios_base::seekdir whence = std::ios_base::cur);
 };

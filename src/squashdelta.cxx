@@ -181,23 +181,20 @@ std::list<struct compressed_block> get_blocks(MMAPFile& f, Compressor*& c,
 	std::cerr << "Hashing " << block_num
 		<< " inode blocks..." << std::endl;
 
-	const char* data_start = static_cast<const char*>(f.data);
-
 	MetadataBlockReader mir(f, sb.inode_table_start, *c);
 	for (size_t i = 0; i < block_num; ++i)
 	{
 		const void* data;
+		size_t pos;
 		size_t length;
 		bool compressed;
 
-		mir.read_input_block(&data, &length, &compressed);
+		mir.read_input_block(&data, &pos, &length, &compressed);
 
 		if (compressed)
 		{
-			const char* data_pos = static_cast<const char*>(data);
-
 			struct compressed_block block;
-			block.offset = data_pos - data_start;
+			block.offset = pos;
 			block.length = length;
 			block.hash = murmurhash3(data, length, 0);
 
@@ -237,17 +234,16 @@ std::list<struct compressed_block> get_blocks(MMAPFile& f, Compressor*& c,
 	for (size_t i = 0; i < block_num; ++i)
 	{
 		const void* data;
+		size_t pos;
 		size_t length;
 		bool compressed;
 
-		mir.read_input_block(&data, &length, &compressed);
+		mir.read_input_block(&data, &pos, &length, &compressed);
 
 		if (compressed)
 		{
-			const char* data_pos = static_cast<const char*>(data);
-
 			struct compressed_block block;
-			block.offset = data_pos - data_start;
+			block.offset = pos;
 			block.length = length;
 			block.hash = murmurhash3(data, length, 0);
 
