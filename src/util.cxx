@@ -111,6 +111,11 @@ size_t MMAPFile::getpos() const
 	return (pos - static_cast<char*>(data));
 }
 
+size_t MMAPFile::getlen() const
+{
+	return length;
+}
+
 void MMAPFile::seek(ssize_t offset, std::ios_base::seekdir whence)
 {
 	char* newpos;

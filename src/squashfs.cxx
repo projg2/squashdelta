@@ -339,7 +339,7 @@ static uint64_t get_fragment_table_offset(const MMAPFile& new_file,
 	// instead, use a value that would trigger a nice EOF when someone
 	// tries to read it
 	if (sb.fragments == 0)
-		return new_file.length;
+		return new_file.getlen();
 
 	MMAPFile f = new_file;
 	f.seek(sb.fragment_table_start, std::ios::beg);

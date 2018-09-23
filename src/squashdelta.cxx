@@ -300,8 +300,8 @@ void write_unpacked_file(SparseFileWriter& outf, MMAPFile& inf,
 	}
 
 	// write the last block
-	outf.write(inf.read_array<char>(inf.length - prev_offset),
-			inf.length - prev_offset);
+	outf.write(inf.read_array<char>(inf.getlen() - prev_offset),
+			inf.getlen() - prev_offset);
 
 	char* buf = new char[block_size];
 	try
@@ -501,7 +501,7 @@ int main(int argc, char* argv[])
 			std::cerr << "Writing expanded source file..." << std::endl;
 
 			c->reset();
-			source_temp.open(source_f.length);
+			source_temp.open(source_f.getlen());
 			write_unpacked_file(source_temp, source_f, source_blocks, *c,
 					block_size);
 			write_block_list(source_temp, dh, source_blocks);
@@ -527,7 +527,7 @@ int main(int argc, char* argv[])
 			std::cerr << "Writing expanded target file..." << std::endl;
 
 			c->reset();
-			target_temp.open(target_f.length);
+			target_temp.open(target_f.getlen());
 			write_unpacked_file(target_temp, target_f, target_blocks, *c,
 					block_size);
 			write_block_list(target_temp, dh, target_blocks);
