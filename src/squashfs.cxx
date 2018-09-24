@@ -112,9 +112,9 @@ size_t MetadataBlockReader::read(void* dest, size_t dest_size)
 {
 	bool compressed;
 	size_t length;
-	const void* data;
+	std::vector<uint8_t> buf;
 
-	read_input_block(&data, nullptr, &length, &compressed);
+	read_input_block(buf, nullptr, &length, &compressed);
 
 	if (!compressed)
 	{
@@ -122,26 +122,29 @@ size_t MetadataBlockReader::read(void* dest, size_t dest_size)
 		if (length > dest_size)
 			throw std::logic_error("Output buffer too small for the metadata");
 
-		memcpy(dest, data, length);
+		memcpy(dest, buf.data(), length);
 		return length;
 	}
 	else
 	{
 		// uncompress to buf
-		return compressor.decompress(dest, data, length, dest_size);
+		return compressor.decompress(dest, buf.data(), length, dest_size);
 	}
 }
 
-void MetadataBlockReader::read_input_block(const void** data,
+void MetadataBlockReader::read_input_block(std::vector<uint8_t>& buf,
 		size_t* pos, size_t* length, bool* compressed)
 {
-	uint16_t block_size = f.read<le16>();
+	le16 block_size_raw;
+	f.read(&block_size_raw);
+	uint16_t block_size = block_size_raw;
 
 	*length = block_size & ~squashfs::inode_size::uncompressed;
 	*compressed = !(block_size & squashfs::inode_size::uncompressed);
 	if (pos)
 		*pos = f.getpos();
-	*data = f.read_array<char>(*length);
+	buf.resize(*length);
+	f.read_array(buf.data(), *length);
 }
 
 MetadataReader::MetadataReader(const MMAPFile& new_file,
@@ -343,7 +346,10 @@ static uint64_t get_fragment_table_offset(const MMAPFile& new_file,
 
 	MMAPFile f = new_file;
 	f.seek(sb.fragment_table_start, std::ios::beg);
-	return f.read<le64>();
+
+	le64 offset;
+	f.read(&offset);
+	return offset;
 }
 
 FragmentTableReader::FragmentTableReader(const MMAPFile& new_file,

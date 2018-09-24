@@ -19,6 +19,8 @@
 #	include "config.h"
 #endif
 
+#include <vector>
+
 extern "C"
 {
 #ifdef HAVE_STDINT_H
@@ -258,7 +260,7 @@ public:
 
 	size_t read(void* dest, size_t dest_size);
 
-	void read_input_block(const void** data, size_t* pos,
+	void read_input_block(std::vector<uint8_t>& buf, size_t* pos,
 			size_t* length, bool* compressed);
 };
 

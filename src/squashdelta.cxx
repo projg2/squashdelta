@@ -11,6 +11,7 @@
 #include <iostream>
 #include <list>
 #include <typeinfo>
+#include <vector>
 
 #include <cerrno>
 #include <cstdio>
@@ -75,7 +76,8 @@ bool sort_by_len_hash(const struct compressed_block& lhs,
 std::list<struct compressed_block> get_blocks(MMAPFile& f, Compressor*& c,
 		size_t& block_size)
 {
-	const squashfs::super_block& sb = f.read<squashfs::super_block>();
+	squashfs::super_block sb;
+	f.read(&sb);
 
 	if (sb.s_magic != squashfs::magic)
 		throw std::runtime_error(
@@ -182,6 +184,7 @@ std::list<struct compressed_block> get_blocks(MMAPFile& f, Compressor*& c,
 		<< " inode blocks..." << std::endl;
 
 	MetadataBlockReader mir(f, sb.inode_table_start, *c);
+	std::vector<uint8_t> buf;
 	for (size_t i = 0; i < block_num; ++i)
 	{
 		const void* data;
@@ -189,14 +192,14 @@ std::list<struct compressed_block> get_blocks(MMAPFile& f, Compressor*& c,
 		size_t length;
 		bool compressed;
 
-		mir.read_input_block(&data, &pos, &length, &compressed);
+		mir.read_input_block(buf, &pos, &length, &compressed);
 
 		if (compressed)
 		{
 			struct compressed_block block;
 			block.offset = pos;
 			block.length = length;
-			block.hash = murmurhash3(data, length, 0);
+			block.hash = murmurhash3(buf.data(), length, 0);
 
 			compressed_metadata_blocks.push_back(block);
 		}
@@ -238,14 +241,14 @@ std::list<struct compressed_block> get_blocks(MMAPFile& f, Compressor*& c,
 		size_t length;
 		bool compressed;
 
-		mir.read_input_block(&data, &pos, &length, &compressed);
+		mir.read_input_block(buf, &pos, &length, &compressed);
 
 		if (compressed)
 		{
 			struct compressed_block block;
 			block.offset = pos;
 			block.length = length;
-			block.hash = murmurhash3(data, length, 0);
+			block.hash = murmurhash3(buf.data(), length, 0);
 
 			compressed_metadata_blocks.push_back(block);
 		}
@@ -257,6 +260,7 @@ std::list<struct compressed_block> get_blocks(MMAPFile& f, Compressor*& c,
 	std::cerr << "Hashing " << compressed_data_blocks.size()
 		<< " data blocks..." << std::endl;
 	MMAPFile hf(f);
+	std::vector<uint8_t> hash_data;
 
 	// record the checksums
 	for (std::list<struct compressed_block>::iterator
@@ -265,7 +269,9 @@ std::list<struct compressed_block> get_blocks(MMAPFile& f, Compressor*& c,
 			++i)
 	{
 		hf.seek((*i).offset, std::ios::beg);
-		(*i).hash = murmurhash3(hf.read_array<uint8_t>((*i).length),
+		hash_data.resize((*i).length);
+		hf.read_array(hash_data.data(), (*i).length);
+		(*i).hash = murmurhash3(hash_data.data(),
 				(*i).length, 0);
 	}
 
@@ -292,7 +298,7 @@ void write_unpacked_file(SparseFileWriter& outf, MMAPFile& inf,
 		prev_offset = (*i).offset + (*i).length;
 
 		// first, copy the data preceeding compressed block
-		outf.write(inf.read_array<char>(pre_length), pre_length);
+		outf.copy_from(inf, pre_length);
 
 		// then, seek through the block
 		inf.seek((*i).length);
@@ -300,10 +306,10 @@ void write_unpacked_file(SparseFileWriter& outf, MMAPFile& inf,
 	}
 
 	// write the last block
-	outf.write(inf.read_array<char>(inf.getlen() - prev_offset),
-			inf.getlen() - prev_offset);
+	outf.copy_from(inf, inf.getlen() - prev_offset);
 
 	char* buf = new char[block_size];
+	std::vector<char> comp_buf;
 	try
 	{
 		for (std::list<struct compressed_block>::iterator i = cb.begin();
@@ -312,7 +318,9 @@ void write_unpacked_file(SparseFileWriter& outf, MMAPFile& inf,
 			size_t unc_length;
 
 			inf.seek((*i).offset, std::ios::beg);
-			unc_length = c.decompress(buf, inf.read_array<char>((*i).length),
+			comp_buf.resize((*i).length);
+			inf.read_array(comp_buf.data(), (*i).length);
+			unc_length = c.decompress(buf, comp_buf.data(),
 					(*i).length, block_size);
 
 			(*i).uncompressed_length = unc_length;

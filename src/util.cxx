@@ -8,6 +8,7 @@
 #	include "config.h"
 #endif
 
+#include <cassert>
 #include <cerrno>
 #include <cstring>
 
@@ -29,15 +30,12 @@ IOError::IOError(const char* text, int new_errno)
 }
 
 MMAPFile::MMAPFile()
-	: fd(-1), pos(0), length(0), data(0)
+	: fd(-1), pos(0), length(0), duplicate(false)
 {
 }
 
-
 MMAPFile::MMAPFile(const MMAPFile& ref)
-	// just copy the data necessary for read/seek
-	// but not the one needed to close/unmap
-	: fd(-1), pos(ref.pos), end(ref.end), length(0), data(ref.data)
+	: fd(ref.fd), pos(ref.pos), length(ref.length), duplicate(true)
 {
 }
 
@@ -53,96 +51,112 @@ void MMAPFile::open(const char* path)
 		throw IOError("Unable to open file", errno);
 
 	// this also checks whether the file is seekable
-	off_t size = lseek(fd, 0, SEEK_END);
-	if (size == -1)
+	off_t ret = lseek(fd, 0, SEEK_END);
+	if (ret == -1)
 	{
 		close();
 		throw IOError("Unable to seek file (not a regular file?)", errno);
 	}
 
 	// size_t <- off_t
-	length = size;
+	length = ret;
 
-	data = mmap(0, size, PROT_READ, MAP_SHARED, fd, 0);
-	if (data == MAP_FAILED)
+	ret = lseek(fd, 0, SEEK_SET);
+	if (ret == -1)
 	{
 		close();
-		throw IOError("Unable to mmap() file", errno);
+		throw IOError("Unable to seek file back (not a regular file?)", errno);
 	}
 
-	pos = static_cast<char*>(data);
-	end = pos + length;
+	pos = 0;
 }
 
 void MMAPFile::close()
 {
-	bool munmap_failed = false;
-	bool close_failed = false;
-
-	if (data && length > 0)
+	if (fd != -1 && !duplicate)
 	{
-		if (::munmap(data, length) == -1)
-			munmap_failed = true;
-		data = 0;
-		length = 0;
-		pos = 0;
-	}
-
-	if (fd != -1)
-	{
-		if (::close(fd) == -1)
-			close_failed = true;
+		int fd_copy = fd;
 		fd = -1;
-	}
 
-	if (munmap_failed && close_failed)
-		throw IOError("Unable to unmap and close file", errno);
-	else if (munmap_failed)
-		throw IOError("Unable to unmap file (yet it was closed)", errno);
-	else if (close_failed)
-		throw IOError("Unable to close file", errno);
+		if (::close(fd_copy) == -1)
+			throw IOError("Unable to close file", errno);
+	}
+}
+
+void MMAPFile::read_bytes(uint8_t* out, size_t n)
+{
+	// reset the position
+	// TODO: render this unnecessary by stopping to use multiple file
+	// instances
+	ssize_t ret = lseek(fd, pos, SEEK_SET);
+	if (ret == -1)
+		throw IOError("Unable to seek file before reading", errno);
+
+	while (n > 0)
+	{
+		ssize_t rd = ::read(fd, out, n);
+		if (rd == -1)
+		{
+			if (errno != EAGAIN)
+				throw IOError("Unable to read file", errno);
+		}
+		else if (rd == 0) // EOF
+			throw std::runtime_error("EOF while reading");
+		else
+		{
+			out += rd;
+			pos += rd;
+			n -= rd;
+		}
+	}
 }
 
 size_t MMAPFile::getpos() const
 {
-	if (!data)
+	if (fd == -1)
 		throw std::logic_error("getpos() for closed file");
 
-	return (pos - static_cast<char*>(data));
+	assert(lseek(fd, 0, SEEK_CUR) == pos);
+	return pos;
 }
 
 size_t MMAPFile::getlen() const
 {
+	if (fd == -1)
+		throw std::logic_error("getlen() for closed file");
+
 	return length;
 }
 
 void MMAPFile::seek(ssize_t offset, std::ios_base::seekdir whence)
 {
-	char* newpos;
+	int new_whence;
 
-	if (!data)
+	if (fd == -1)
 		throw std::logic_error("Seeking closed file");
 
 	switch (whence)
 	{
 		case std::ios::beg:
-			newpos = static_cast<char*>(data);
+			new_whence = SEEK_SET;
 			break;
 		case std::ios::cur:
-			newpos = pos;
+			new_whence = SEEK_CUR;
 			break;
 		case std::ios::end:
-			newpos = end;
+			new_whence = SEEK_END;
 			break;
 		default:
 			throw std::logic_error("Invalid value for whence");
 	}
 
-	newpos += offset;
-	if (newpos > end)
-		throw std::runtime_error("EOF while seeking");
+	ssize_t ret = lseek(fd, offset, new_whence);
+	if (ret == -1)
+		throw IOError("Unable to seek file", errno);
 
-	pos = newpos;
+	pos = ret;
+	if (pos > length)
+		throw std::runtime_error("EOF while seeking");
 }
 
 SparseFileWriter::SparseFileWriter()
@@ -202,6 +216,19 @@ void SparseFileWriter::write_sparse(size_t length)
 		throw IOError("lseek() failed to seek past sparse block", errno);
 
 	offset = past;
+}
+
+void SparseFileWriter::copy_from(MMAPFile& f, size_t length)
+{
+	uint8_t buf[BUFSIZ];
+
+	while (length > 0)
+	{
+		size_t sz = length > BUFSIZ ? BUFSIZ : length;
+		f.read_array(buf, sz);
+		write(buf, sz);
+		length -= sz;
+	}
 }
 
 TemporarySparseFileWriter::TemporarySparseFileWriter()
