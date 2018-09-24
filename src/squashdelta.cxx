@@ -332,9 +332,10 @@ void write_unpacked_file(SparseFileWriter& outf, MMAPFile& inf,
 	}
 	catch (std::exception& e)
 	{
-		delete buf;
+		delete[] buf;
 		throw;
 	}
+	delete[] buf;
 }
 
 void write_block_list(SparseFileWriter& outf, sqdelta_header h,
