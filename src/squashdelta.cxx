@@ -164,13 +164,13 @@ std::list<struct compressed_block> get_blocks(MMAPFile& f, Compressor*& c,
 					assert(len != 0);
 					pos += len;
 				}
-				else
+				// if length == 0, it indicates a sparse block
+				else if (block_list[j] != 0)
 				{
 					// record the compressed block
 					struct compressed_block block;
 					block.offset = pos;
 					block.length = block_list[j];
-					assert(block.length != 0);
 
 					compressed_data_blocks.push_back(block);
 					pos += block.length;
