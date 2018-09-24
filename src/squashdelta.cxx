@@ -159,7 +159,10 @@ std::list<struct compressed_block> get_blocks(MMAPFile& f, Compressor*& c,
 				if (block_list[j] & squashfs::block_size::uncompressed)
 				{
 					// seek over the uncompressed block
-					pos += (block_list[j] & ~squashfs::block_size::uncompressed);
+					uint32_t len = (block_list[j]
+							& ~squashfs::block_size::uncompressed);
+					assert(len != 0);
+					pos += len;
 				}
 				else
 				{
@@ -167,6 +170,7 @@ std::list<struct compressed_block> get_blocks(MMAPFile& f, Compressor*& c,
 					struct compressed_block block;
 					block.offset = pos;
 					block.length = block_list[j];
+					assert(block.length != 0);
 
 					compressed_data_blocks.push_back(block);
 					pos += block.length;
@@ -194,6 +198,7 @@ std::list<struct compressed_block> get_blocks(MMAPFile& f, Compressor*& c,
 		bool compressed;
 
 		mir.read_input_block(buf, &pos, &length, &compressed);
+		assert(length != 0);
 
 		if (compressed)
 		{
@@ -214,6 +219,7 @@ std::list<struct compressed_block> get_blocks(MMAPFile& f, Compressor*& c,
 	for (uint32_t i = 0; i < sb.fragments; ++i)
 	{
 		const struct squashfs::fragment_entry& fe = fr.read();
+		assert(fe.size != 0);
 
 		if (!(fe.size & squashfs::block_size::uncompressed))
 		{
