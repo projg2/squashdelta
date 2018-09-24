@@ -13,6 +13,7 @@
 #include <typeinfo>
 #include <vector>
 
+#include <cassert>
 #include <cerrno>
 #include <cstdio>
 #include <cstdlib>
@@ -294,6 +295,8 @@ void write_unpacked_file(SparseFileWriter& outf, MMAPFile& inf,
 	for (std::list<struct compressed_block>::iterator i = cb.begin();
 			i != cb.end(); ++i)
 	{
+		assert((*i).offset > prev_offset);
+
 		size_t pre_length = (*i).offset - prev_offset;
 		prev_offset = (*i).offset + (*i).length;
 
