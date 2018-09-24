@@ -128,7 +128,7 @@ size_t LZOCompressor::decompress(void* dest, const void* src,
 		lzo_uint comp_bytes = length;
 
 		ret = lzo1x_999_compress_level(dest2, out_bytes, cbuf, &comp_bytes,
-					workspace, 0, 0, 0, compression_level) != LZO_E_OK;
+					workspace, 0, 0, 0, compression_level);
 
 		if (ret == LZO_E_OK && comp_bytes == length)
 		{
