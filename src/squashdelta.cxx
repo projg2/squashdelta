@@ -11,7 +11,6 @@
 #include <iostream>
 #include <list>
 #include <typeinfo>
-#include <vector>
 
 #include <cassert>
 #include <cerrno>
@@ -77,8 +76,7 @@ bool sort_by_len_hash(const struct compressed_block& lhs,
 std::list<struct compressed_block> get_blocks(MMAPFile& f, Compressor*& c,
 		size_t& block_size)
 {
-	squashfs::super_block sb;
-	f.read(&sb);
+	const squashfs::super_block& sb = f.read<squashfs::super_block>();
 
 	if (sb.s_magic != squashfs::magic)
 		throw std::runtime_error(
@@ -189,7 +187,6 @@ std::list<struct compressed_block> get_blocks(MMAPFile& f, Compressor*& c,
 		<< " inode blocks..." << std::endl;
 
 	MetadataBlockReader mir(f, sb.inode_table_start, *c);
-	std::vector<uint8_t> buf;
 	for (size_t i = 0; i < block_num; ++i)
 	{
 		const void* data;
@@ -197,7 +194,7 @@ std::list<struct compressed_block> get_blocks(MMAPFile& f, Compressor*& c,
 		size_t length;
 		bool compressed;
 
-		mir.read_input_block(buf, &pos, &length, &compressed);
+		mir.read_input_block(&data, &pos, &length, &compressed);
 		assert(length != 0);
 
 		if (compressed)
@@ -205,7 +202,7 @@ std::list<struct compressed_block> get_blocks(MMAPFile& f, Compressor*& c,
 			struct compressed_block block;
 			block.offset = pos;
 			block.length = length;
-			block.hash = murmurhash3(buf.data(), length, 0);
+			block.hash = murmurhash3(data, length, 0);
 
 			compressed_metadata_blocks.push_back(block);
 		}
@@ -248,14 +245,14 @@ std::list<struct compressed_block> get_blocks(MMAPFile& f, Compressor*& c,
 		size_t length;
 		bool compressed;
 
-		mir.read_input_block(buf, &pos, &length, &compressed);
+		mir.read_input_block(&data, &pos, &length, &compressed);
 
 		if (compressed)
 		{
 			struct compressed_block block;
 			block.offset = pos;
 			block.length = length;
-			block.hash = murmurhash3(buf.data(), length, 0);
+			block.hash = murmurhash3(data, length, 0);
 
 			compressed_metadata_blocks.push_back(block);
 		}
@@ -267,19 +264,25 @@ std::list<struct compressed_block> get_blocks(MMAPFile& f, Compressor*& c,
 	std::cerr << "Hashing " << compressed_data_blocks.size()
 		<< " data blocks..." << std::endl;
 	MMAPFile hf(f);
-	std::vector<uint8_t> hash_data;
 
-	// record the checksums
+	// record the checksums and perform initial deduplication
 	for (std::list<struct compressed_block>::iterator
-			i = compressed_data_blocks.begin();
-			i != compressed_data_blocks.end();
-			++i)
+			i = compressed_data_blocks.begin(),
+			j = compressed_data_blocks.end();
+			i != compressed_data_blocks.end();)
 	{
+		// duplicates will be adjacent after sorting
+		if ((*i).offset == ((*j).offset))
+		{
+			assert((*i).length == (*j).length);
+			i = compressed_data_blocks.erase(i);
+			continue;
+		}
+
 		hf.seek((*i).offset, std::ios::beg);
-		hash_data.resize((*i).length);
-		hf.read_array(hash_data.data(), (*i).length);
-		(*i).hash = murmurhash3(hash_data.data(),
+		(*i).hash = murmurhash3(hf.read_array<uint8_t>((*i).length),
 				(*i).length, 0);
+		j = i++;
 	}
 
 	compressed_data_blocks.splice(compressed_data_blocks.end(),
@@ -307,7 +310,7 @@ void write_unpacked_file(SparseFileWriter& outf, MMAPFile& inf,
 		prev_offset = (*i).offset + (*i).length;
 
 		// first, copy the data preceeding compressed block
-		outf.copy_from(inf, pre_length);
+		outf.write(inf.read_array<char>(pre_length), pre_length);
 
 		// then, seek through the block
 		inf.seek((*i).length);
@@ -315,10 +318,10 @@ void write_unpacked_file(SparseFileWriter& outf, MMAPFile& inf,
 	}
 
 	// write the last block
-	outf.copy_from(inf, inf.getlen() - prev_offset);
+	outf.write(inf.read_array<char>(inf.getlen() - prev_offset),
+			inf.getlen() - prev_offset);
 
 	char* buf = new char[block_size];
-	std::vector<char> comp_buf;
 	try
 	{
 		for (std::list<struct compressed_block>::iterator i = cb.begin();
@@ -327,9 +330,7 @@ void write_unpacked_file(SparseFileWriter& outf, MMAPFile& inf,
 			size_t unc_length;
 
 			inf.seek((*i).offset, std::ios::beg);
-			comp_buf.resize((*i).length);
-			inf.read_array(comp_buf.data(), (*i).length);
-			unc_length = c.decompress(buf, comp_buf.data(),
+			unc_length = c.decompress(buf, inf.read_array<char>((*i).length),
 					(*i).length, block_size);
 
 			(*i).uncompressed_length = unc_length;

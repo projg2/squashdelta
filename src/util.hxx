@@ -71,9 +71,11 @@ public:
 class MMAPFile
 {
 	int fd;
+	void* data;
 	size_t length;
-	size_t pos;
-	bool duplicate;
+
+	char* pos;
+	char* end;
 
 	void close();
 
@@ -85,16 +87,14 @@ public:
 	void open(const char* path);
 
 	template <class T>
-	void peek(T* out);
+	const T& peek();
 	template <class T>
-	void read(T* out);
+	const T& read();
 
 	template <class T>
-	void peek_array(T* out, size_t n);
+	const T* peek_array(size_t n);
 	template <class T>
-	void read_array(T* out, size_t n);
-
-	void read_bytes(uint8_t* out, size_t n);
+	const T* read_array(size_t n);
 
 	size_t getpos() const;
 	size_t getlen() const;
@@ -103,29 +103,33 @@ public:
 };
 
 template <class T>
-void MMAPFile::peek(T* out)
+const T& MMAPFile::peek()
 {
-	peek_array<T>(out, 1);
+	return *peek_array<T>(1);
 }
 
 template <class T>
-void MMAPFile::read(T* out)
+const T& MMAPFile::read()
 {
-	read_array<T>(out, 1);
+	return *read_array<T>(1);
 }
 
 template <class T>
-void MMAPFile::peek_array(T* out, size_t n)
+const T* MMAPFile::peek_array(size_t n)
 {
-	read_array<T>(out, n);
-	seek(-n * sizeof (T), std::ios::cur);
+	// ensure we don't run out of data :)
+	if (!pos || pos + sizeof(T) * n > end)
+		throw std::runtime_error("EOF while reading");
+
+	return static_cast<T*>(static_cast<void*>(pos));
 }
 
 template <class T>
-void MMAPFile::read_array(T* out, size_t n)
+const T* MMAPFile::read_array(size_t n)
 {
-	read_bytes(static_cast<uint8_t*>(static_cast<void*>(out)),
-			n * sizeof (T));
+	const T* ret = peek_array<T>(n);
+	seek(sizeof(T) * n);
+	return ret;
 }
 
 class SparseFileWriter
@@ -143,7 +147,6 @@ public:
 
 	void write(const void* data, size_t length);
 	void write_sparse(size_t length);
-	void copy_from(MMAPFile& f, size_t length);
 
 	template <class T>
 	void write(const T& data);
