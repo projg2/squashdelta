@@ -50,7 +50,8 @@ namespace squashfs
 			lzma = 2,
 			lzo = 3,
 			xz = 4,
-			lz4 = 5
+			lz4 = 5,
+			zstd = 6,
 		};
 	}
 
