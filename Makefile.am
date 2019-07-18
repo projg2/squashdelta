@@ -13,7 +13,8 @@ squashdelta_SOURCES = \
 
 squashdelta_CPPFLAGS = \
 	$(LZO_CFLAGS) \
-	$(LZ4_CFLAGS)
+	$(LZ4_CFLAGS) \
+        -std=c++11
 squashdelta_LDADD = \
 	$(LZO_LIBS) \
 	$(LZ4_LIBS)
