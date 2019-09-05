@@ -266,8 +266,9 @@ public:
 class MetadataReader
 {
 	MetadataBlockReader f;
-
-	char buf[2 * squashfs::metadata_size];
+        
+	static const size_t buf_size = 16 * squashfs::metadata_size;
+	char buf[buf_size];
 	char* bufp;
 	size_t buf_filled;
 	size_t _block_num;
