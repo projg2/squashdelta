@@ -156,7 +156,7 @@ void MetadataReader::poll_data()
 	char* writep = bufp + buf_filled;
 
 	// if we're past half buffer, shift it
-	if (writep - buf > squashfs::metadata_size)
+	if (writep - buf > (buf_size/2))
 	{
 		// we're past half, so we won't have more than half :)
 		// therefore, no risk of overlapping areas
