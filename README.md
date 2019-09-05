@@ -1,6 +1,11 @@
 # squashdelta
 Create efficient deltas (patches) between two SquashFS images
 
+## Install dependencies
+```bash
+$ sudo apt install automake libboost-dev liblz4-dev xdelta3
+```
+
 ## Building from source
 This project uses [autotools](http://inti.sourceforge.net/tutorial/libinti/autotoolsproject.html)
 
