@@ -29,7 +29,7 @@ IOError::IOError(const char* text, int new_errno)
 }
 
 MMAPFile::MMAPFile()
-	: fd(-1), pos(0), length(0), data(0)
+	: fd(-1), data(0), length(0), pos(0)
 {
 }
 
@@ -37,7 +37,7 @@ MMAPFile::MMAPFile()
 MMAPFile::MMAPFile(const MMAPFile& ref)
 	// just copy the data necessary for read/seek
 	// but not the one needed to close/unmap
-	: fd(-1), pos(ref.pos), end(ref.end), length(0), data(ref.data)
+	: fd(-1), data(ref.data), length(0), pos(ref.pos), end(ref.end)
 {
 }
 
